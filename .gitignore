@@ -1,0 +1,33 @@
+# Root-level ignore
+.DS_Store
+.env
+.env.*
+*.log
+*.sqlite3
+__pycache__/
+*.pyc
+
+# Ignore node and Python environment folders
+node_modules/
+venv/
+.env/
+.venv/
+.idea/
+.vscode/
+*.swp
+
+# Build & cache outputs
+dist/
+build/
+.next/
+out/
+coverage/
+.cache/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+*.egg
+
+# OS junk
+Thumbs.db
+.DS_Store
