@@ -1,15 +1,34 @@
+version: '3.8'
+
 services:
+  backend:
+    build: ./backend
+    container_name: orchestrator-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app  # live reload
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - temporal
+
   postgres:
     image: postgres:15-alpine
     container_name: orchestrator-postgres
     environment:
-      POSTGRES_DB: temporal
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      POSTGRES_DB: orchestrator_db  # only your app DB
     ports:
       - "5432:5432"
+    volumes:
+      - lyzr_postgres_data:/var/lib/postgresql/data
+      - ./backend/init-scripts:/docker-entrypoint-initdb.d  # optional
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d temporal"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d orchestrator_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,12 +58,12 @@ services:
       - DB_PORT=5432
       - POSTGRES_USER=admin
       - POSTGRES_PWD=admin
-      - POSTGRES_SEEDS=orchestrator-postgres
+      - POSTGRES_SEEDS=postgres
       - DBNAME=temporal
       - VISIBILITY_DBNAME=temporal_visibility
     ports:
-      - "7233:7233"
-      - "8233:8233"
+      - "7233:7233"  # Temporal Frontend service
+      - "8233:8233"  # Temporal UI
     volumes:
       - lyzr_temporal_data:/etc/temporal
     healthcheck:
@@ -54,5 +73,6 @@ services:
       retries: 5
 
 volumes:
+  lyzr_postgres_data:
   lyzr_redis_data:
   lyzr_temporal_data:

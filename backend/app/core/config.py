@@ -35,6 +35,6 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings():
-    return Settings()
+    return Settings() # type: ignore # Will load from .env automatically
 
 settings = get_settings()

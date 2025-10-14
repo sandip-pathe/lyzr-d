@@ -20,9 +20,11 @@ class NotificationService:
     
     async def _send_slack(self, workflow_id: str, node_id: str, title: str, description: str):
         """Send Slack message with approval buttons"""
+        if not settings.SLACK_WEBHOOK_URL:
+            raise ValueError("SLACK_WEBHOOK_URL not configured")
+        
         async with httpx.AsyncClient() as client:
-            await client.post(
-                settings.SLACK_WEBHOOK_URL,
+            await client.post(settings.SLACK_WEBHOOK_URL, 
                 json={
                     "text": f"🔔 {title}",
                     "blocks": [

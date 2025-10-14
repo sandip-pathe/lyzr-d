@@ -34,3 +34,17 @@ python-dotenv==1.0.1
 python-multipart==0.0.12
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+
+# NEW for compliance/evals/advanced nodes
+jsonschema==4.23.0
+jsonpath-ng==1.6.1
+cryptography==42.0.8
+
+# NEW for Slack/E-mail notifications
+slack-sdk==3.31.0
+
+# NEW for metrics
+prometheus-client==0.20.0
+
+# NEW for narration/reporting
+markdown==3.6

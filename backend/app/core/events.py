@@ -1,47 +1,93 @@
-import redis
+import redis.asyncio as redis
 import json
 import asyncio
-from typing import Callable, Dict, Any
+import time
+from typing import Callable, Dict, Any, List, Optional, Union
+from datetime import datetime
+from uuid import uuid4
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models.event_log import EventLog
 
 class EventBus:
     def __init__(self):
         self.redis_client = redis.from_url(
-            settings.REDIS_URL,
-            decode_responses=True
+            settings.REDIS_URL, decode_responses=True
         )
         self.pubsub = self.redis_client.pubsub()
-        self.listeners: Dict[str, list[Callable]] = {}
-    
-    def publish(self, event_type: str, data: Dict[str, Any]):
-        """Publish event to Redis"""
-        message = {
+        self.listeners: Dict[str, List[Callable]] = {}
+
+    async def publish(self, event_type: str, data: Dict[str, Any]):
+        timestamp = time.time()
+        message: Dict[str, Any] = {
             "event_type": event_type,
-            "data": data,
-            "timestamp": asyncio.get_event_loop().time()
+            "data": json.dumps(data),
+            "timestamp": str(timestamp),
         }
-        self.redis_client.publish(event_type, json.dumps(message))
+        await self.redis_client.publish(event_type, json.dumps(message))
+
+        workflow_id = data.get("workflow_id")
+        execution_id = data.get("execution_id")
+
+        if workflow_id:
+            stream_key = f"workflow:{workflow_id}:events"
+            await self.redis_client.xadd(stream_key, message, maxlen=10000)
+
+        if execution_id:
+            stream_key = f"execution:{execution_id}:events"
+            await self.redis_client.xadd(stream_key, message, maxlen=5000)
+
+        await asyncio.to_thread(self._persist_to_db, event_type, data, timestamp)
         print(f"📤 Event published: {event_type}")
-    
-    def subscribe(self, event_type: str, callback: Callable):
-        """Subscribe to event type"""
+
+    def _persist_to_db(self, event_type: str, data: Dict[str, Any], timestamp: float):
+        try:
+            db = SessionLocal()
+            event_log = EventLog(id=str(uuid4()), workflow_id=data.get("workflow_id", ""), execution_id=data.get("execution_id", ""), node_id=data.get("node_id"), event_type=event_type, event_data=data, timestamp=datetime.fromtimestamp(timestamp))
+            db.add(event_log)
+            db.commit()
+            db.close()
+        except Exception as e:
+            print(f"⚠️ Failed to persist event to DB: {e}")
+
+    async def subscribe(self, event_type: str, callback: Callable):
         if event_type not in self.listeners:
             self.listeners[event_type] = []
-            self.pubsub.subscribe(event_type)
+            await self.pubsub.subscribe(event_type)
         self.listeners[event_type].append(callback)
         print(f"📥 Subscribed to: {event_type}")
-    
-    async def listen(self):
-        """Listen for events (run in background)"""
-        for message in self.pubsub.listen():
-            if message["type"] == "message":
-                event_type = message["channel"]
-                data = json.loads(message["data"])
-                
-                # Call all callbacks for this event
-                if event_type in self.listeners:
-                    for callback in self.listeners[event_type]:
-                        await callback(data)
 
-# Global event bus instance
+    async def listen(self):
+        async for message in self.pubsub.listen():
+            if message["type"] == "message":
+                try:
+                    data = json.loads(message["data"])
+                    event_type = data["event_type"]
+                    if event_type in self.listeners:
+                        for callback in self.listeners[event_type]:
+                            if asyncio.iscoroutinefunction(callback):
+                                await callback(data)
+                except Exception as e:
+                    print(f"❌ Event listener error: {e}")
+
+    # --- RE-IMPLEMENTED ASYNC REPLAY METHODS ---
+    async def replay_from_stream(self, stream_key: str, start_id: str = "-", end_id: str = "+", count: Optional[int] = None) -> List[Dict[str, Any]]:
+        try:
+            events = await self.redis_client.xrange(stream_key, min=start_id, max=end_id, count=count)
+            return [{"id": event_id, "timestamp": float(data.get("timestamp", 0)), "event_type": data.get("event_type"), "data": json.loads(data.get("data", "{}")) if isinstance(data.get("data"), str) else data.get("data", {})} for event_id, data in events]
+        except Exception as e:
+            print(f"❌ Failed to replay stream {stream_key}: {e}")
+            return []
+
+    async def replay_workflow_events(self, workflow_id: str, from_timestamp: Optional[float] = None) -> List[Dict[str, Any]]:
+        stream_key = f"workflow:{workflow_id}:events"
+        start_id = f"{int(from_timestamp * 1000)}-0" if from_timestamp else "-"
+        return await self.replay_from_stream(stream_key, start_id=start_id)
+
+    async def replay_execution_events(self, execution_id: str, from_timestamp: Optional[float] = None) -> List[Dict[str, Any]]:
+        stream_key = f"execution:{execution_id}:events"
+        start_id = f"{int(from_timestamp * 1000)}-0" if from_timestamp else "-"
+        return await self.replay_from_stream(stream_key, start_id=start_id)
+
+
 event_bus = EventBus()

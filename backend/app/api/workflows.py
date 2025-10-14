@@ -1,8 +1,8 @@
+"""Workflow API endpoints - enhanced with pause/resume/reset"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowHandle
 from uuid import uuid4
-
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.workflow import Workflow, Execution
@@ -11,14 +11,17 @@ from app.temporal.workflows import OrchestrationWorkflow
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
+async def get_temporal_client() -> Client:
+    """Get Temporal client"""
+    return await Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE)
+
 @router.post("/")
 async def create_workflow(
     workflow: WorkflowCreateSchema,
     db: Session = Depends(get_db)
 ):
-    """Create new workflow"""
+    """Create new workflow definition"""
     workflow_id = str(uuid4())
-    
     db_workflow = Workflow(
         id=workflow_id,
         name=workflow.name,
@@ -36,74 +39,131 @@ async def create_workflow(
 
 @router.get("/{workflow_id}")
 async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    """Get workflow by ID"""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
-    if not workflow:
-        raise HTTPException(404, "Workflow not found")
-    return workflow
-
-@router.post("/{workflow_id}/execute")
-async def execute_workflow(
-    workflow_id: str,
-    execute_data: WorkflowExecuteSchema,
-    db: Session = Depends(get_db)
-):
-    """Start workflow execution"""
-    # Get workflow
+    """Get workflow definition"""
     workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
     if not workflow:
         raise HTTPException(404, "Workflow not found")
     
-    # Create execution record
+    return {
+        "id": workflow.id,
+        "name": workflow.name,
+        "description": workflow.description,
+        "definition": workflow.definition,
+        "created_at": workflow.created_at
+    }
+
+@router.post("/{workflow_id}/execute")
+async def execute_workflow(
+    workflow_id: str,
+    execute_request: WorkflowExecuteSchema,
+    db: Session = Depends(get_db)
+):
+    """Start workflow execution"""
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(404, "Workflow not found")
+    
     execution_id = str(uuid4())
+    
+    # Create execution record
     execution = Execution(
         id=execution_id,
         workflow_id=workflow_id,
         status="running",
-        input_data=execute_data.input_data
+        input_data=execute_request.input_data
     )
     db.add(execution)
     db.commit()
     
     # Start Temporal workflow
-    client = await Client.connect(settings.TEMPORAL_HOST)
+    client = await get_temporal_client()
+    
     handle = await client.start_workflow(
         OrchestrationWorkflow.run,
-        args=[execution_id, workflow.definition, execute_data.input_data, workflow_id],
+        args=[workflow_id, workflow.definition, execute_request.input_data],
         id=execution_id,
-        task_queue="orchestrator-tasks",
+        task_queue="orchestration-queue"
     )
     
     return {
         "execution_id": execution_id,
-        "status": "running",
-        "workflow_id": handle.id
+        "workflow_id": workflow_id,
+        "status": "running"
     }
 
-@router.get("/{workflow_id}/executions/{execution_id}")
-async def get_execution(
-    workflow_id: str,
-    execution_id: str,
-    db: Session = Depends(get_db)
-):
-    """Get execution status"""
-    execution = db.query(Execution).filter(
-        Execution.id == execution_id,
-        Execution.workflow_id == workflow_id
-    ).first()
-    
-    if not execution:
-        raise HTTPException(404, "Execution not found")
-    
-    # Query Temporal for current state
-    client = await Client.connect(settings.TEMPORAL_HOST)
+@router.post("/{workflow_id}/pause")
+async def pause_workflow(workflow_id: str, execution_id: str):
+    """Pause running workflow"""
+    client = await get_temporal_client()
     handle = client.get_workflow_handle(execution_id)
     
     try:
+        await handle.signal(OrchestrationWorkflow.pause)
+        return {"status": "paused", "execution_id": execution_id}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to pause: {str(e)}")
+
+@router.post("/{workflow_id}/resume")
+async def resume_workflow(workflow_id: str, execution_id: str):
+    """Resume paused workflow"""
+    client = await get_temporal_client()
+    handle = client.get_workflow_handle(execution_id)
+    
+    try:
+        await handle.signal(OrchestrationWorkflow.resume)
+        return {"status": "resumed", "execution_id": execution_id}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to resume: {str(e)}")
+
+@router.get("/{workflow_id}/history")
+async def get_workflow_history(workflow_id: str, execution_id: str):
+    """Get workflow execution history from Temporal"""
+    client = await get_temporal_client()
+    handle = client.get_workflow_handle(execution_id)
+    
+    try:
+        # Query workflow state
         state = await handle.query(OrchestrationWorkflow.get_state)
+        
+        # Get event history from Temporal
+        history = []
+        history_result = await handle.fetch_history()
+        for event in history_result.events:
+            history.append({
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "timestamp": event.event_time
+            })
+        
         return {
-            **execution.__dict__,
-            "current_state": state
+            "execution_id": execution_id,
+            "state": state,
+            "history": history
         }
-    except:
-        return execution
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get history: {str(e)}")
+
+@router.post("/{workflow_id}/compensate")
+async def trigger_compensation(workflow_id: str, execution_id: str):
+    """Manually trigger compensation/rollback"""
+    # This would terminate workflow and trigger compensation
+    client = await get_temporal_client()
+    handle = client.get_workflow_handle(execution_id)
+    
+    try:
+        await handle.terminate(reason="Manual compensation triggered")
+        return {"status": "compensating", "execution_id": execution_id}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to compensate: {str(e)}")
+
+@router.delete("/{workflow_id}")
+async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    """Delete workflow definition"""
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(404, "Workflow not found")
+    
+    db.delete(workflow)
+    db.commit()
+    
+    return {"status": "deleted", "workflow_id": workflow_id}
