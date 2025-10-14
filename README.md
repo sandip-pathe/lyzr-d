@@ -9,7 +9,7 @@
 
 Modern AI systems are transitioning from linear, deterministic workflows to adaptive, agentic processes characterized by non-deterministic decision-making. Current orchestration tools (e.g., Airflow, n8n) lack the necessary architectural primitives to handle this paradigm shift. We present **Agentic Orchestration Builder**, a novel framework that bridges deterministic workflow engines with non-deterministic agentic systems through temporal durability, event-driven execution, and human-in-the-loop checkpoints. Our system enables seamless collaboration between structured business logic and intelligent agentic components while maintaining full auditability and state persistence.
 
-![System Architecture](https://www.researchgate.net/publication/349843644/figure/fig1/AS:11431281347279207@1743701829224/Step-by-step-block-diagram-of-the-proposed-research-Step-1-theoretical-study-step-2_W640.jpg)
+![System Architecture](https://blog.aspiresys.com/wp-content/uploads/2025/01/Infographics_Benefits-of-Agentic-AI-for-Businesses-1-1024x626.jpg)
 
 ## 1. Introduction
 
