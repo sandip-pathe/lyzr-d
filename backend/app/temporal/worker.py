@@ -13,7 +13,8 @@ from app.temporal.activities import (
     execute_merge_node,
     execute_timer_node,
     execute_event_node,
-    execute_meta_node
+    execute_meta_node,
+    publish_workflow_status
 )
 
 async def main():
@@ -36,7 +37,8 @@ async def main():
             execute_merge_node,
             execute_timer_node,
             execute_event_node,
-            execute_meta_node
+            execute_meta_node,
+            publish_workflow_status
         ]
     )
     
@@ -49,7 +51,8 @@ async def main():
         execute_merge_node,
         execute_timer_node,
         execute_event_node,
-        execute_meta_node
+        execute_meta_node,
+        publish_workflow_status
     ]
     print(f"Registered activities ⚡: {[a.__name__ for a in activities_list]}")
     

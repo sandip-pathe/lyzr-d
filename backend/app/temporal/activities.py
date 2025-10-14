@@ -4,7 +4,7 @@ from uuid import uuid4
 from temporalio import activity
 import httpx
 import asyncio
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 from app.services.agent_executor import AgentExecutor
 from app.services.eval_service import EvalService
 from app.core.database import SessionLocal
@@ -248,3 +248,15 @@ async def execute_meta_node(node: dict, state: dict) -> dict:
         return metrics
     
     return {"operation": operation}
+
+@activity.defn
+async def publish_workflow_status(execution_id: str, workflow_id: str, status: str, result: Optional[Dict[str, Any]] = None, error: Optional[str] = None):
+    """Publish workflow completion or failure event."""
+    event_type = f"workflow.{status}"
+    data = {
+        "execution_id": execution_id,
+        "workflow_id": workflow_id,
+        "result": result,
+        "error": error
+    }
+    await event_bus.publish(event_type, data)

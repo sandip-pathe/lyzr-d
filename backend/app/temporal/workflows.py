@@ -18,7 +18,8 @@ with workflow.unsafe.imports_passed_through():
         execute_merge_node,
         execute_timer_node,
         execute_event_node,
-        execute_meta_node
+        execute_meta_node,
+        publish_workflow_status # Import the new activity
     )
 
 
@@ -105,6 +106,13 @@ class OrchestrationWorkflow:
                     await self._trigger_compensation(nodes)
                     raise
 
+            # Publish completion event
+            await workflow.execute_activity(
+                publish_workflow_status,
+                args=[workflow.info().workflow_id, workflow_id, "completed", self.current_state.get("previous_output")],
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+
             return {
                 "status": "completed",
                 "result": self.current_state.get("previous_output"),
@@ -113,6 +121,12 @@ class OrchestrationWorkflow:
 
         except Exception as e:
             workflow.logger.error(f"💥 Workflow failed: {str(e)}")
+            # Publish failure event
+            await workflow.execute_activity(
+                publish_workflow_status,
+                args=[workflow.info().workflow_id, workflow_id, "failed", None, str(e)],
+                start_to_close_timeout=timedelta(seconds=10),
+            )
             return {
                 "status": "failed",
                 "error": str(e),

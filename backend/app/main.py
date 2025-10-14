@@ -1,3 +1,4 @@
+import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from temporalio.client import Client
@@ -107,7 +108,8 @@ async def update_execution_status_on_event(event_data: dict):
     from datetime import datetime, timezone
 
     event_type = event_data.get("event_type")
-    data = event_data.get("data", {})
+    # FIX: The 'data' field is a JSON string and needs to be parsed
+    data = json.loads(event_data.get("data", "{}"))
     execution_id = data.get("execution_id")
 
     if not execution_id or event_type not in ["workflow.completed", "workflow.failed"]:
