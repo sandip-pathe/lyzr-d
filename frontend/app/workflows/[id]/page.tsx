@@ -1,10 +1,10 @@
-import { Canvas } from "@/components/ui/canvas/canvas";
+import { WorkflowCanvas } from "@/components/ui/canvas/canvas";
 import { Toaster } from "sonner";
 
 export default function WorkflowEditorPage() {
   return (
     <>
-      <Canvas />
+      <WorkflowCanvas />
       <Toaster position="bottom-right" />
     </>
   );

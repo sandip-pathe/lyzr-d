@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "../textarea";
 
 export function PropertiesPanel() {
-  const { selectedNode, nodes, updateNode, setSelectedNode } =
+  const { selectedNodeId, nodes, updateNode, setSelectedNode } =
     useWorkflowStore();
 
-  const node = nodes.find((n) => n.id === selectedNode);
+  const node = nodes.find((n) => n.id === selectedNodeId);
 
-  if (!selectedNode || !node) {
+  if (!selectedNodeId || !node) {
     return (
       <div className="w-80 border-l border-gray-200 bg-white p-6">
         <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">

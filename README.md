@@ -11,6 +11,9 @@ Modern AI systems are transitioning from linear, deterministic workflows to adap
 
 ![System Architecture](https://blog.aspiresys.com/wp-content/uploads/2025/01/Infographics_Benefits-of-Agentic-AI-for-Businesses-1-1024x626.jpg)
 
+
+![Pub Sub](https://a.storyblok.com/f/231922/1726x800/3100b5f90a/pub-sub-model.png/m/0x0/)
+
 ## 1. Introduction
 
 ### 1.1 Problem Statement
