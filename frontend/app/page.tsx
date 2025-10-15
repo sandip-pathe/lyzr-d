@@ -1,146 +1,190 @@
 "use client";
 
-import { useEffect } from "react";
-import { useWorkflowWebSocket } from "@/hooks/useWorkflowWebSocket";
-import { useWorkflow } from "@/hooks/useWorkflow";
-import { mockNodes, mockEdges, mockApprovalRequest } from "@/lib/mock-data";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
-import { ApprovalModal } from "@/components/modals/approval";
-import { TimelinePanel } from "@/components/panel/timeline";
-import { EventLogStream } from "@/components/sidebar/event-log";
-import { NodePalette } from "@/components/sidebar/node-pallete";
-import { PropertiesPanel } from "@/components/sidebar/properties";
-import { WorkflowCanvas } from "@/components/ui/canvas/canvas";
-import { useWorkflowStore } from "@/lib/store";
-import { ExecutionToolbar } from "@/components/toolbar/top";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { ArrowRight, FileText, Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { toast } from "sonner";
+import Link from "next/link";
+import { timeAgo } from "@/lib/utils";
 
-export default function WorkflowPage() {
+// API function to fetch all workflows from the backend
+async function fetchWorkflows() {
+  const res = await fetch(`http://localhost:8000/workflows/`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch workflows.");
+  }
+  return res.json();
+}
+
+// API function to create a new, empty workflow
+async function createNewWorkflow() {
+  const res = await fetch(`http://localhost:8000/workflows/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Untitled Workflow",
+      description: "A new workflow started from the dashboard.",
+      nodes: [],
+      edges: [],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to create new workflow.");
+  }
+  return res.json();
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
+  // Fetch all workflows to display on the dashboard
   const {
-    mode,
-    leftSidebarOpen,
-    rightSidebarOpen,
-    setNodes,
-    setEdges,
-    workflowId,
-  } = useWorkflowStore();
+    data: workflowsData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["workflows"],
+    queryFn: fetchWorkflows,
+  });
 
-  const [approvalOpen, setApprovalOpen] = useState(false);
+  // Mutation to handle creating a new workflow and redirecting
+  const createWorkflowMutation = useMutation({
+    mutationFn: createNewWorkflow,
+    onSuccess: (data) => {
+      router.push(`/workflows/${data.id}`);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
 
-  const MOCK_WORKFLOW_ID = "65084d97-b820-4a40-9e57-dcc6dd095c70";
-
-  // Initialize with mock data
-  useEffect(() => {
-    setNodes(mockNodes);
-    setEdges(mockEdges);
-  }, [setNodes, setEdges]);
-
-  const { isLoading, error } = useWorkflow(MOCK_WORKFLOW_ID);
-
-  // Connect to WebSocket when executing
-  useWorkflowWebSocket(workflowId, mode === "executing");
-
-  // Simulate approval request after 5 seconds of execution
-  useEffect(() => {
-    if (mode === "executing") {
-      const timeout = setTimeout(() => {
-        setApprovalOpen(true);
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [mode]);
-
-  const handleApprove = async (comment: string) => {
-    console.log("Approved with comment:", comment);
-    // In production: POST /approvals/${approval.id}/approve
+  const handleCreateNew = () => {
+    createWorkflowMutation.mutate();
   };
-
-  const handleReject = async (comment: string) => {
-    console.log("Rejected with comment:", comment);
-    // In production: POST /approvals/${approval.id}/reject
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        Loading Workflow...
-      </div>
-    );
-  }
-
-  if (error) {
-    // If the workflow is not found, we can let the user create a new one.
-    // For other errors, we show a message.
-    if (error.message.includes("404")) {
-      // You could set the store to a clean state here if needed
-      // resetWorkflow(); // Example: clear everything for a new workflow
-      console.warn("Workflow not found, starting with a blank canvas.");
-    } else {
-      return (
-        <div className="flex h-screen items-center justify-center">
-          Error: {error.message}
-        </div>
-      );
-    }
-  }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      {/* Toolbar */}
-      <ExecutionToolbar />
+    <div className="bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto p-8">
+        {/* Header Section */}
+        <header className="flex items-center justify-between pb-8 border-b">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, Sandip
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Build, refine, and productionize agents effortlessly in minutes.
+            </p>
+          </div>
+          <div className="flex items-center gap-4 text-sm font-medium">
+            <a href="#" className="text-purple-600 hover:text-purple-800">
+              Docs <ArrowRight className="inline w-4 h-4" />
+            </a>
+            <a href="#" className="text-purple-600 hover:text-purple-800">
+              APIs <ArrowRight className="inline w-4 h-4" />
+            </a>
+            <a href="#" className="text-purple-600 hover:text-purple-800">
+              Tutorials <ArrowRight className="inline w-4 h-4" />
+            </a>
+          </div>
+        </header>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <AnimatePresence>
-          {leftSidebarOpen && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex-shrink-0 overflow-hidden"
+        {/* Build Section */}
+        <section className="mt-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Build</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer bg-white"
+              onClick={handleCreateNew}
             >
-              {mode === "design" ? <NodePalette /> : <EventLogStream />}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-lg">
+                  <div className="p-3 bg-purple-100 rounded-lg">
+                    <Plus className="w-6 h-6 text-purple-600" />
+                  </div>
+                  New Workflow
+                </CardTitle>
+                <CardDescription>Start from a blank canvas.</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </section>
 
-        {/* Canvas */}
-        <div className="flex-1 relative">
-          <WorkflowCanvas />
-        </div>
-
-        {/* Right Sidebar */}
-        <AnimatePresence>
-          {rightSidebarOpen && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 380, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex-shrink-0 overflow-hidden"
-            >
-              <PropertiesPanel />
-            </motion.div>
+        {/* Your Workflows Section */}
+        <section className="mt-12">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Your Workflows
+          </h2>
+          {isLoading && (
+            <div className="text-center p-12 text-gray-500">
+              <Loader2 className="w-8 h-8 mx-auto animate-spin mb-3" />
+              <p>Loading your workflows...</p>
+            </div>
           )}
-        </AnimatePresence>
+          {error && (
+            <div className="text-center p-8 text-red-600 bg-red-50 rounded-lg">
+              {error.message}
+            </div>
+          )}
+
+          {/* Workflow List */}
+          {workflowsData && workflowsData.items.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {workflowsData.items.map((wf: any) => (
+                <Link href={`/workflows/${wf.id}`} key={wf.id} passHref>
+                  <Card className="hover:border-purple-500 hover:shadow-md transition-all h-full flex flex-col bg-white">
+                    <CardHeader>
+                      <CardTitle className="flex items-start gap-3">
+                        <FileText className="w-5 h-5 text-gray-400 mt-1 flex-shrink-0" />
+                        <span className="flex-1 line-clamp-2">{wf.name}</span>
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {wf.description || "No description provided."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-auto text-xs text-gray-500 pt-4">
+                      Updated {timeAgo(wf.updated_at)}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {workflowsData && workflowsData.items.length === 0 && (
+            <div className="text-center py-16 border-2 border-dashed rounded-lg">
+              <FileText className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-500 font-medium">
+                You haven&apos;t created any workflows yet.
+              </p>
+              <p className="text-sm text-gray-400">
+                Get started by creating a new one.
+              </p>
+              <Button
+                onClick={handleCreateNew}
+                className="mt-6"
+                disabled={createWorkflowMutation.isPending}
+              >
+                {createWorkflowMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Create Your First Workflow
+              </Button>
+            </div>
+          )}
+        </section>
       </div>
-
-      {/* Bottom Timeline Panel */}
-      <TimelinePanel />
-
-      {/* Approval Modal */}
-      <ApprovalModal
-        approval={mockApprovalRequest}
-        open={approvalOpen}
-        onClose={() => setApprovalOpen(false)}
-        onApprove={handleApprove}
-        onReject={handleReject}
-      />
     </div>
   );
 }

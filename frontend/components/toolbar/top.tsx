@@ -13,6 +13,7 @@ import {
   Upload,
   Layout,
   Sidebar,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -56,24 +57,6 @@ export function ExecutionToolbar() {
     setMode("paused");
   };
 
-  const handleStop = () => {
-    setMode("design");
-    clearEvents();
-  };
-
-  const handleReset = () => {
-    if (confirm("Reset workflow to default state?")) {
-      resetWorkflow();
-      if (layoutType === "dag") {
-        setNodes(mockNodes);
-        setEdges(mockEdges);
-      } else {
-        setNodes(mockEventHubNodes);
-        setEdges(mockEventHubEdges);
-      }
-    }
-  };
-
   const handleLoadTemplate = () => {
     if (layoutType === "dag") {
       setNodes(mockNodes);
@@ -86,8 +69,12 @@ export function ExecutionToolbar() {
 
   const queryClient = useQueryClient();
 
+  // --- MUTATION FOR EXECUTING THE WORKFLOW ---
   const executeMutation = useMutation({
     mutationFn: (inputData: any) => {
+      if (!workflowId) {
+        throw new Error("No workflow ID is set.");
+      }
       return fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}/execute`,
         {
@@ -95,26 +82,53 @@ export function ExecutionToolbar() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ input_data: inputData }),
         }
-      ).then((res) => res.json());
+      ).then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to start workflow execution.");
+        }
+        return res.json();
+      });
     },
     onSuccess: (data) => {
-      toast.success("Workflow execution started!");
+      toast.success("Workflow execution started!", {
+        description: `Execution ID: ${data.execution_id}`,
+      });
       setMode("executing");
       clearEvents();
     },
     onError: (error) => toast.error(`Execution failed: ${error.message}`),
   });
 
+  // --- MUTATION FOR SAVING THE WORKFLOW ---
   const saveMutation = useMutation({
     mutationFn: () => {
+      if (!workflowId) {
+        throw new Error("No workflow ID is set.");
+      }
+      const payload = {
+        name: workflowName,
+        description: "Updated from the UI",
+        nodes: nodes.map(({ id, type, position, data }) => ({
+          id,
+          type,
+          position,
+          data,
+        })),
+        edges: edges.map(({ id, source, target }) => ({ id, source, target })),
+      };
       return fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nodes, edges }),
+          body: JSON.stringify(payload),
         }
-      );
+      ).then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to save the workflow.");
+        }
+        return res.json();
+      });
     },
     onSuccess: () => {
       toast.success("Workflow saved successfully!");
@@ -124,13 +138,24 @@ export function ExecutionToolbar() {
   });
 
   const handleExecute = () => {
-    if (!workflowId) return;
     executeMutation.mutate({});
   };
 
   const handleSave = () => {
-    if (!workflowId) return;
     saveMutation.mutate();
+  };
+
+  const handleStop = () => {
+    setMode("design");
+    clearEvents();
+  };
+
+  const handleReset = () => {
+    if (confirm("Reset workflow to default state?")) {
+      resetWorkflow();
+      setNodes(mockNodes);
+      setEdges(mockEdges);
+    }
   };
 
   return (
@@ -163,10 +188,14 @@ export function ExecutionToolbar() {
       <div className="flex items-center gap-2">
         <Button
           onClick={handleExecute}
-          disabled={mode === "executing"}
+          disabled={mode === "executing" || executeMutation.isPending}
           className="bg-green-600 hover:bg-green-700"
         >
-          <Play className="w-4 h-4 mr-2" />
+          {executeMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4 mr-2" />
+          )}
           Run
         </Button>
 
@@ -192,50 +221,22 @@ export function ExecutionToolbar() {
           <RotateCcw className="w-4 h-4 mr-2" />
           Reset
         </Button>
-
-        <Separator orientation="vertical" className="h-8" />
-
-        {/* Execution Stats */}
-        {mode !== "design" && (
-          <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 rounded-md text-sm">
-            <div>
-              <span className="text-gray-600">Duration:</span>{" "}
-              <span className="font-mono font-semibold">{executionTime}</span>
-            </div>
-            <div>
-              <span className="text-gray-600">Nodes:</span>{" "}
-              <span className="font-semibold">{completedNodes}/10</span>
-            </div>
-            <div>
-              <span className="text-gray-600">Cost:</span>{" "}
-              <span className="font-semibold text-green-600">
-                ${totalCost.toFixed(2)}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Right Section - Actions */}
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={handleLoadTemplate}>
-          <Upload className="w-4 h-4 mr-2" />
-          Load Template
-        </Button>
-
         <Button
           variant="outline"
           size="sm"
           onClick={handleSave}
-          disabled={saveMutation.status === "pending" || !workflowId}
+          disabled={saveMutation.isPending || !workflowId}
         >
-          {saveMutation.status === "pending" ? (
-            "Saving..."
+          {saveMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" /> Save
-            </>
+            <Save className="w-4 h-4 mr-2" />
           )}
+          Save
         </Button>
 
         <Button variant="outline" size="sm">
@@ -260,14 +261,6 @@ export function ExecutionToolbar() {
           onClick={toggleRightSidebar}
         >
           <Sidebar className="w-4 h-4 rotate-180" />
-        </Button>
-
-        <Button
-          variant={bottomPanelOpen ? "default" : "outline"}
-          size="sm"
-          onClick={toggleBottomPanel}
-        >
-          <Layout className="w-4 h-4" />
         </Button>
       </div>
     </div>

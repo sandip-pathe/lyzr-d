@@ -71,15 +71,25 @@ export interface Workflow {
   updatedAt: string;
 }
 
+// --- [THIS IS THE CORRECTED/IMPROVED SECTION] ---
+export type EventTypeName =
+  | "started"
+  | "completed"
+  | "failed"
+  | "approval_requested"
+  | "updated";
+
 export interface ExecutionEvent {
   id: string;
   workflowId: string;
-  nodeId: string;
-  eventType: "started" | "completed" | "failed" | "approval_requested";
+  executionId: string; // <-- ADDED for clarity and correct filtering
+  nodeId?: string; // NodeId can be optional for workflow-level events
+  eventType: EventTypeName;
   timestamp: string;
   data?: any;
   error?: string;
 }
+// --- [END OF CORRECTION] ---
 
 export interface ApprovalRequest {
   id: string;

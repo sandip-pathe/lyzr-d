@@ -6,6 +6,7 @@ import {
   WorkflowMode,
   ExecutionEvent,
   LayoutType,
+  ApprovalRequest,
 } from "@/types/workflow";
 
 interface WorkflowState {
@@ -21,7 +22,7 @@ interface WorkflowState {
   selectedNodeId: string | null;
 
   // Execution data
-  executionId: string | null;
+  executionId: string | null; // <-- ADDED
   events: ExecutionEvent[];
 
   // UI state
@@ -31,14 +32,13 @@ interface WorkflowState {
 
   // WebSocket
   wsConnected: boolean;
+  currentApproval: ApprovalRequest | null;
+  setCurrentApproval: (approval: ApprovalRequest | null) => void;
 
   // Actions
-  setWorkflow: (
-    id: string,
-    name: string,
-    nodes: WorkflowNode[],
-    edges: WorkflowEdge[]
-  ) => void;
+  setWorkflowId: (id: string) => void; // <-- ADDED
+  setWorkflowName: (name: string) => void; // <-- ADDED
+  setExecutionId: (id: string | null) => void; // <-- ADDED
   setMode: (mode: WorkflowMode) => void;
   setLayoutType: (type: LayoutType) => void;
   setNodes: (nodes: WorkflowNode[]) => void;
@@ -77,13 +77,17 @@ export const useWorkflowStore = create<WorkflowState>()(
     bottomPanelOpen: false,
     wsConnected: false,
 
+    currentApproval: null,
+    // ... (previous actions)
+    setCurrentApproval: (approval) => set({ currentApproval: approval }),
+
     // Actions
-    setWorkflow: (id, name, nodes, edges) =>
-      set({ workflowId: id, workflowName: name, nodes, edges }),
+    setWorkflowId: (id) => set({ workflowId: id }),
+    setWorkflowName: (name) => set({ workflowName: name }),
+    setExecutionId: (id) => set({ executionId: id }),
 
     setMode: (mode) => {
       set({ mode });
-      // Auto-adjust sidebars based on mode
       if (mode === "executing") {
         set({
           leftSidebarOpen: true,
@@ -138,7 +142,7 @@ export const useWorkflowStore = create<WorkflowState>()(
 
     addEvent: (event) =>
       set((state) => ({
-        events: [...state.events, event],
+        events: [event, ...state.events], // Prepend for chronological order in UI
       })),
 
     clearEvents: () => set({ events: [] }),

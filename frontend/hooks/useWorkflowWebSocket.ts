@@ -3,128 +3,112 @@
 import { useEffect, useRef } from "react";
 import { ExecutionEvent } from "@/types/workflow";
 import { useWorkflowStore } from "@/lib/store";
+import { toast } from "sonner";
 
 interface WebSocketMessage {
-  type: "event" | "status" | "error";
-  data: any;
+  event_type: string;
+  data: string; // The data from Redis is a JSON string
+  timestamp: string;
 }
 
 export function useWorkflowWebSocket(
-  workflowId: string | null,
+  executionId: string | null,
   enabled: boolean = true
 ) {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
-
-  const { addEvent, updateNodeStatus, setWsConnected } = useWorkflowStore();
+  const { addEvent, updateNodeStatus, setWsConnected, setMode } =
+    useWorkflowStore();
 
   useEffect(() => {
-    if (!workflowId || !enabled) {
-      return;
-    }
-
-    const connect = () => {
-      try {
-        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/events/ws/workflows/${workflowId}`;
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          console.log("[WebSocket] Connected to workflow", workflowId);
-          setWsConnected(true);
-          reconnectAttemptsRef.current = 0;
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const message: WebSocketMessage = JSON.parse(event.data);
-
-            switch (message.type) {
-              case "event":
-                const executionEvent: ExecutionEvent = message.data;
-                addEvent(executionEvent);
-
-                // Update node status based on event
-                if (executionEvent.eventType === "started") {
-                  updateNodeStatus(executionEvent.nodeId, "running");
-                } else if (executionEvent.eventType === "completed") {
-                  updateNodeStatus(executionEvent.nodeId, "completed");
-                } else if (executionEvent.eventType === "failed") {
-                  updateNodeStatus(executionEvent.nodeId, "failed");
-                } else if (executionEvent.eventType === "approval_requested") {
-                  updateNodeStatus(executionEvent.nodeId, "waiting_approval");
-                }
-                break;
-
-              case "status":
-                // Handle workflow status updates
-                console.log("[WebSocket] Workflow status:", message.data);
-                break;
-
-              case "error":
-                console.error("[WebSocket] Error:", message.data);
-                break;
-            }
-          } catch (error) {
-            console.error("[WebSocket] Failed to parse message:", error);
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error("[WebSocket] Error:", error);
-          setWsConnected(false);
-        };
-
-        ws.onclose = () => {
-          console.log("[WebSocket] Connection closed");
-          setWsConnected(false);
-
-          // Attempt to reconnect
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            const delay = Math.min(
-              1000 * Math.pow(2, reconnectAttemptsRef.current),
-              10000
-            );
-            console.log(`[WebSocket] Reconnecting in ${delay}ms...`);
-
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectAttemptsRef.current += 1;
-              connect();
-            }, delay);
-          } else {
-            console.error("[WebSocket] Max reconnection attempts reached");
-          }
-        };
-
-        wsRef.current = ws;
-      } catch (error) {
-        console.error("[WebSocket] Failed to connect:", error);
-        setWsConnected(false);
-      }
-    };
-
-    connect();
-
-    // Cleanup
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+    if (!executionId || !enabled) {
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
+      return;
+    }
+
+    const wsUrl = `ws://localhost:8000/events/ws/executions/${executionId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log("[WebSocket] Connected for execution", executionId);
+      setWsConnected(true);
+      toast.info("Real-time connection established.");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message: WebSocketMessage = JSON.parse(event.data);
+        const eventData = JSON.parse(message.data); // Parse the inner data string
+
+        const executionEvent: ExecutionEvent = {
+          id: `${eventData.node_id}-${message.timestamp}`,
+          workflowId: eventData.workflow_id,
+          executionId: eventData.execution_id,
+          nodeId: eventData.node_id,
+          eventType: message.event_type.split(".")[1] as any, // "node.completed" -> "completed"
+          timestamp: new Date(
+            parseFloat(message.timestamp) * 1000
+          ).toISOString(),
+          data: eventData.result || eventData.error,
+        };
+
+        addEvent(executionEvent);
+
+        // Update node status based on event
+        if (executionEvent.nodeId) {
+          if (executionEvent.eventType === "started") {
+            updateNodeStatus(executionEvent.nodeId, "running");
+          } else if (executionEvent.eventType === "completed") {
+            updateNodeStatus(executionEvent.nodeId, "completed");
+          } else if (executionEvent.eventType === "failed") {
+            updateNodeStatus(executionEvent.nodeId, "failed");
+          }
+        }
+
+        // Handle workflow-level events
+        if (message.event_type === "workflow.completed") {
+          toast.success("Workflow Completed Successfully!");
+          setMode("completed");
+        }
+        if (message.event_type === "workflow.failed") {
+          toast.error("Workflow Failed", {
+            description: eventData.error,
+          });
+          setMode("failed");
+        }
+      } catch (error) {
+        console.error("[WebSocket] Failed to parse message:", error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("[WebSocket] Error:", error);
+      toast.error("WebSocket connection error.");
       setWsConnected(false);
     };
-  }, [workflowId, enabled, addEvent, updateNodeStatus, setWsConnected]);
 
-  return {
-    isConnected: wsRef.current?.readyState === WebSocket.OPEN,
-    send: (data: any) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(data));
+    ws.onclose = () => {
+      console.log("[WebSocket] Connection closed");
+      setWsConnected(false);
+    };
+
+    wsRef.current = ws;
+
+    // Cleanup on component unmount or when executionId changes
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
-    },
-  };
+    };
+  }, [
+    executionId,
+    enabled,
+    addEvent,
+    updateNodeStatus,
+    setWsConnected,
+    setMode,
+  ]);
 }

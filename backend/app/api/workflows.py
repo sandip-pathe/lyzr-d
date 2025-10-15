@@ -1,5 +1,6 @@
 """Workflow API endpoints - enhanced with pause/resume/reset"""
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from temporalio.client import Client, WorkflowHandle
 from uuid import uuid4
@@ -14,6 +15,13 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 async def get_temporal_client() -> Client:
     """Get Temporal client"""
     return await Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE)
+
+# --- [NEW ENDPOINT] ---
+@router.get("/")
+async def list_workflows(db: Session = Depends(get_db)):
+    """List all available workflow definitions"""
+    workflows = db.query(Workflow).order_by(desc(Workflow.updated_at)).all()
+    return {"items": workflows}
 
 @router.post("/")
 async def create_workflow(
@@ -156,6 +164,38 @@ async def trigger_compensation(workflow_id: str, execution_id: str):
     except Exception as e:
         raise HTTPException(500, f"Failed to compensate: {str(e)}")
 
+@router.put("/{workflow_id}")
+async def update_workflow(
+    workflow_id: str,
+    workflow_update: WorkflowUpdateSchema,
+    db: Session = Depends(get_db)
+):
+    """Update an existing workflow definition"""
+    db_workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not db_workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Pydantic's exclude_unset is great for PATCH, but for PUT we want to update the whole definition.
+    update_data = workflow_update.dict()
+
+    if "name" in update_data:
+        db_workflow.name = update_data["name"]
+    if "description" in update_data:
+        db_workflow.description = update_data["description"]
+    
+    # Update the definition field with the new nodes and edges
+    # This replaces the entire 'definition' JSONB field.
+    db_workflow.definition = {
+        "nodes": [n for n in update_data.get("nodes", [])],
+        "edges": [e for e in update_data.get("edges", [])]
+    }
+
+    db.commit()
+    db.refresh(db_workflow)
+    
+    return {"id": db_workflow.id, "status": "updated"}
+
+
 @router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
     """Delete workflow definition"""
@@ -167,38 +207,3 @@ async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "deleted", "workflow_id": workflow_id}
-
-@router.put("/{workflow_id}")
-async def update_workflow(
-    workflow_id: str,
-    workflow_update: WorkflowUpdateSchema,
-    db: Session = Depends(get_db)
-):
-    """Update an existing workflow definition"""
-    db_workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
-    if not db_workflow:
-        raise HTTPException(404, "Workflow not found")
-
-    update_data = workflow_update.dict(exclude_unset=True, exclude_none=True)
-
-    
-    if "nodes" in update_data or "edges" in update_data:
-        new_definition = db_workflow.definition.copy()
-
-        if "nodes" in update_data:
-        # update_data already contains plain dicts/lists
-            new_definition["nodes"] = update_data["nodes"]
-        if "edges" in update_data:
-            new_definition["edges"] = update_data["edges"]
-
-        db_workflow.definition = new_definition
-
-    if "name" in update_data:
-        db_workflow.name = update_data["name"]
-    if "description" in update_data:
-        db_workflow.description = update_data["description"]
-    
-    db.commit()
-    db.refresh(db_workflow)
-    
-    return {"id": db_workflow.id, "status": "updated"}

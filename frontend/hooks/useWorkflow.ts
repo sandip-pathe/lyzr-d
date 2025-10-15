@@ -14,7 +14,8 @@ async function fetchWorkflow(workflowId: string) {
 }
 
 export function useWorkflow(workflowId: string) {
-  const { setNodes, setEdges, setWorkflow } = useWorkflowStore();
+  const { setWorkflowId, setWorkflowName, setNodes, setEdges } =
+    useWorkflowStore();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["workflow", workflowId],
@@ -24,15 +25,12 @@ export function useWorkflow(workflowId: string) {
 
   useEffect(() => {
     if (data) {
-      // Once data is fetched, update the Zustand store
-      setWorkflow(
-        data.id,
-        data.name,
-        data.definition.nodes,
-        data.definition.edges
-      );
+      setWorkflowId(data.id);
+      setWorkflowName(data.name);
+      setNodes(data.nodes || []);
+      setEdges(data.edges || []);
     }
-  }, [data, setWorkflow]);
+  }, [data, setWorkflowId, setWorkflowName, setNodes, setEdges]);
 
   return { workflow: data, isLoading, error };
 }
