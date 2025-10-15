@@ -14,6 +14,7 @@ import {
   Layout,
   Sidebar,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   mockNodes,
@@ -23,6 +24,7 @@ import {
   mockEvents,
 } from "@/lib/mock-data";
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function ExecutionToolbar() {
   const {
@@ -41,23 +43,14 @@ export function ExecutionToolbar() {
     addEvent,
     clearEvents,
     resetWorkflow,
+    nodes,
+    edges,
+    workflowId,
   } = useWorkflowStore();
 
   const [executionTime, setExecutionTime] = useState("00:00:00");
   const [completedNodes, setCompletedNodes] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
-
-  const handleExecute = () => {
-    setMode("executing");
-    clearEvents();
-
-    // Simulate events for demo
-    mockEvents.forEach((event, index) => {
-      setTimeout(() => {
-        addEvent(event);
-      }, index * 1000);
-    });
-  };
 
   const handlePause = () => {
     setMode("paused");
@@ -89,6 +82,55 @@ export function ExecutionToolbar() {
       setNodes(mockEventHubNodes);
       setEdges(mockEventHubEdges);
     }
+  };
+
+  const queryClient = useQueryClient();
+
+  const executeMutation = useMutation({
+    mutationFn: (inputData: any) => {
+      return fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}/execute`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input_data: inputData }),
+        }
+      ).then((res) => res.json());
+    },
+    onSuccess: (data) => {
+      toast.success("Workflow execution started!");
+      setMode("executing");
+      clearEvents();
+    },
+    onError: (error) => toast.error(`Execution failed: ${error.message}`),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      return fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodes, edges }),
+        }
+      );
+    },
+    onSuccess: () => {
+      toast.success("Workflow saved successfully!");
+      queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] });
+    },
+    onError: (error) => toast.error(`Save failed: ${error.message}`),
+  });
+
+  const handleExecute = () => {
+    if (!workflowId) return;
+    executeMutation.mutate({});
+  };
+
+  const handleSave = () => {
+    if (!workflowId) return;
+    saveMutation.mutate();
   };
 
   return (
@@ -181,9 +223,19 @@ export function ExecutionToolbar() {
           Load Template
         </Button>
 
-        <Button variant="outline" size="sm">
-          <Save className="w-4 h-4 mr-2" />
-          Save
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSave}
+          disabled={saveMutation.status === "pending" || !workflowId}
+        >
+          {saveMutation.status === "pending" ? (
+            "Saving..."
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" /> Save
+            </>
+          )}
         </Button>
 
         <Button variant="outline" size="sm">

@@ -6,7 +6,7 @@ from uuid import uuid4
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.workflow import Workflow, Execution
-from app.schemas.workflow import WorkflowCreateSchema, WorkflowExecuteSchema
+from app.schemas.workflow import WorkflowCreateSchema, WorkflowExecuteSchema, WorkflowUpdateSchema
 from app.temporal.workflows import OrchestrationWorkflow
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -167,3 +167,38 @@ async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "deleted", "workflow_id": workflow_id}
+
+@router.put("/{workflow_id}")
+async def update_workflow(
+    workflow_id: str,
+    workflow_update: WorkflowUpdateSchema,
+    db: Session = Depends(get_db)
+):
+    """Update an existing workflow definition"""
+    db_workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not db_workflow:
+        raise HTTPException(404, "Workflow not found")
+
+    update_data = workflow_update.dict(exclude_unset=True, exclude_none=True)
+
+    
+    if "nodes" in update_data or "edges" in update_data:
+        new_definition = db_workflow.definition.copy()
+
+        if "nodes" in update_data:
+        # update_data already contains plain dicts/lists
+            new_definition["nodes"] = update_data["nodes"]
+        if "edges" in update_data:
+            new_definition["edges"] = update_data["edges"]
+
+        db_workflow.definition = new_definition
+
+    if "name" in update_data:
+        db_workflow.name = update_data["name"]
+    if "description" in update_data:
+        db_workflow.description = update_data["description"]
+    
+    db.commit()
+    db.refresh(db_workflow)
+    
+    return {"id": db_workflow.id, "status": "updated"}

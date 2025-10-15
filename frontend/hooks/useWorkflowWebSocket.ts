@@ -27,8 +27,7 @@ export function useWorkflowWebSocket(
 
     const connect = () => {
       try {
-        // In production, use actual backend WebSocket URL
-        const wsUrl = `ws://localhost:8000/events/ws/workflows/${workflowId}`;
+        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/events/ws/workflows/${workflowId}`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {

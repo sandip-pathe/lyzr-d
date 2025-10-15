@@ -1,4 +1,5 @@
 """WebSocket events API"""
+import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from typing import Optional, Set, Dict
 import asyncio
@@ -65,9 +66,15 @@ async def replay_execution_events(execution_id: str, from_timestamp: Optional[fl
 async def push_to_websocket_clients(event_data: dict):
     workflow_id = event_data.get("data", {}).get("workflow_id")
     execution_id = event_data.get("data", {}).get("execution_id")
-    
+
+    # Parse the inner 'data' string into an object before broadcasting
+    try:
+        if isinstance(event_data.get("data"), str):
+            event_data["data"] = json.loads(event_data["data"])
+    except json.JSONDecodeError:
+        pass # Or log an error if parsing fails
+
     if workflow_id:
         await manager.broadcast(f"workflow:{workflow_id}", event_data)
     if execution_id:
         await manager.broadcast(f"execution:{execution_id}", event_data)
-

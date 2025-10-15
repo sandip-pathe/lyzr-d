@@ -27,3 +27,9 @@ class ApprovalResponseSchema(BaseModel):
     action: str = Field(..., description="approve|reject")
     approver: str = Field(..., description="Approver email or ID")
     comment: Optional[str] = None
+
+class WorkflowUpdateSchema(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    nodes: Optional[List[NodeSchema]] = None
+    edges: Optional[List[EdgeSchema]] = None

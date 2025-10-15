@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useWorkflowWebSocket } from "@/hooks/useWorkflowWebSocket";
+import { useWorkflow } from "@/hooks/useWorkflow";
 import { mockNodes, mockEdges, mockApprovalRequest } from "@/lib/mock-data";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
@@ -13,8 +14,11 @@ import { PropertiesPanel } from "@/components/sidebar/properties";
 import { WorkflowCanvas } from "@/components/ui/canvas/canvas";
 import { useWorkflowStore } from "@/lib/store";
 import { ExecutionToolbar } from "@/components/toolbar/top";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function WorkflowPage() {
+  const queryClient = useQueryClient();
+
   const {
     mode,
     leftSidebarOpen,
@@ -26,11 +30,15 @@ export default function WorkflowPage() {
 
   const [approvalOpen, setApprovalOpen] = useState(false);
 
+  const MOCK_WORKFLOW_ID = "65084d97-b820-4a40-9e57-dcc6dd095c70";
+
   // Initialize with mock data
   useEffect(() => {
     setNodes(mockNodes);
     setEdges(mockEdges);
   }, [setNodes, setEdges]);
+
+  const { isLoading, error } = useWorkflow(MOCK_WORKFLOW_ID);
 
   // Connect to WebSocket when executing
   useWorkflowWebSocket(workflowId, mode === "executing");
@@ -54,6 +62,30 @@ export default function WorkflowPage() {
     console.log("Rejected with comment:", comment);
     // In production: POST /approvals/${approval.id}/reject
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading Workflow...
+      </div>
+    );
+  }
+
+  if (error) {
+    // If the workflow is not found, we can let the user create a new one.
+    // For other errors, we show a message.
+    if (error.message.includes("404")) {
+      // You could set the store to a clean state here if needed
+      // resetWorkflow(); // Example: clear everything for a new workflow
+      console.warn("Workflow not found, starting with a blank canvas.");
+    } else {
+      return (
+        <div className="flex h-screen items-center justify-center">
+          Error: {error.message}
+        </div>
+      );
+    }
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
