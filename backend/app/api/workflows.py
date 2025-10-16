@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models.workflow import Workflow, Execution
 from app.schemas.workflow import WorkflowCreateSchema, WorkflowExecuteSchema, WorkflowUpdateSchema
 from app.temporal.workflows import OrchestrationWorkflow
+from app.services.validation import validate_workflow
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -80,6 +81,14 @@ async def execute_workflow(
         status="running",
         input_data=execute_request.input_data
     )
+    
+    errors = validate_workflow(workflow.dict())
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail={"errors": errors},
+        )
+    
     db.add(execution)
     db.commit()
     

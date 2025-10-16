@@ -35,6 +35,9 @@ interface WorkflowState {
   currentApproval: ApprovalRequest | null;
   setCurrentApproval: (approval: ApprovalRequest | null) => void;
 
+  output: { status: string; result: any } | null;
+  setOutput: (output: { status: string; result: any } | null) => void;
+
   // Actions
   setWorkflowId: (id: string) => void; // <-- ADDED
   setWorkflowName: (name: string) => void; // <-- ADDED
@@ -77,10 +80,10 @@ export const useWorkflowStore = create<WorkflowState>()(
     bottomPanelOpen: false,
     wsConnected: false,
     currentApproval: null,
-    // ... (previous actions)
-    setCurrentApproval: (approval) => set({ currentApproval: approval }),
+    output: null,
 
     // Actions
+    setCurrentApproval: (approval) => set({ currentApproval: approval }),
     setWorkflowId: (id) => set({ workflowId: id }),
     setWorkflowName: (name) => set({ workflowName: name }),
     setExecutionId: (id) => set({ executionId: id }),
@@ -162,6 +165,7 @@ export const useWorkflowStore = create<WorkflowState>()(
       })),
 
     setWsConnected: (connected) => set({ wsConnected: connected }),
+    setOutput: (output) => set({ output }),
 
     resetWorkflow: () =>
       set({
@@ -172,6 +176,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         executionId: null,
         events: [],
         layoutType: "dag",
+        output: null,
       }),
   }))
 );

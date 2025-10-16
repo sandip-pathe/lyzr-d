@@ -47,33 +47,41 @@ Our architecture employs a layered approach that separates concerns while mainta
 ### 2.2 Architectural Overview
 
 ```mermaid
-graph TB
+graph TD
     subgraph Frontend
-        A[React Flow Canvas] --> B[WebSocket Client]
+        A[React Flow Canvas] --> B{Run Workflow};
+        B --> C[RunWorkflowModal];
+        C --> D{Execute};
+        D --> E[useMutation];
     end
-    
-    subgraph API Layer
-        C[FastAPI Server] --> D[WebSocket Handler]
-        C --> E[Workflow Controller]
-        C --> F[Approval Handler]
+
+    subgraph "API Layer"
+        F[FastAPI Server] --> G[Workflow Controller];
+        G --> H{/execute};
     end
-    
-    subgraph Execution Engine
-        G[Temporal Worker] --> H[Workflow Execution]
-        G --> I[Activity Execution]
+
+    subgraph "Execution Engine"
+        I[Temporal Worker] --> J[OrchestrationWorkflow];
+        J --> K[Activity Execution];
     end
-    
+
     subgraph Infrastructure
-        J[Redis Pub/Sub] --> K[Event Dispatcher]
-        L[PostgreSQL] --> M[State Store]
-        N[Agent APIs] --> O[Decision Engine]
+        L[Redis Pub/Sub] --> M[Event Dispatcher];
+        N[PostgreSQL] --> O[State Store];
+        P[Agent APIs] --> Q[Decision Engine];
     end
-    
-    B --> D
-    E --> G
-    H --> J
-    I --> N
-    K --> C
+
+    subgraph "Real-time Updates"
+        R[WebSocket Client] --> S[useWorkflowWebSocket];
+        S --> T[EventLogStream];
+        S --> U[OutputSidebar];
+    end
+
+    E --> H;
+    H --> J;
+    J --> L;
+    K --> P;
+    M --> R;
 ```
 
 *Figure 1: System component interaction diagram illustrating the flow of control and data between architectural layers.*

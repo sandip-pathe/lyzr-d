@@ -89,6 +89,24 @@ export function EventLogStream({
             </div>
           ) : (
             events.map((event, index) => {
+              if (event.eventType === "failed") {
+                return (
+                  <div
+                    key={index}
+                    className="p-4 bg-red-50 border-l-4 border-red-500"
+                  >
+                    <h3 className="font-bold text-red-800">
+                      Validation Failed
+                    </h3>
+                    <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+                      {event.data.errors.map((error: string, index: number) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+
               const Icon = eventIcons[event.eventType] || Activity;
               const colorClass =
                 eventColors[event.eventType] || "text-gray-400 bg-gray-800";

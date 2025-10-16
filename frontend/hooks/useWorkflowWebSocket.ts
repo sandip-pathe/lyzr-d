@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 interface WebSocketMessage {
   event_type: string;
-  data: string; // The data from Redis is a JSON string
+  data: string;
   timestamp: string;
 }
 
@@ -22,6 +22,8 @@ export function useWorkflowWebSocket(
     setWsConnected,
     setMode,
     setCurrentApproval,
+    setOutput,
+    wsConnected,
   } = useWorkflowStore();
 
   useEffect(() => {
@@ -76,12 +78,14 @@ export function useWorkflowWebSocket(
         if (message.event_type === "workflow.completed") {
           toast.success("Workflow Completed Successfully!");
           setMode("completed");
+          setOutput({ status: "completed", result: eventData.result });
         }
         if (message.event_type === "workflow.failed") {
           toast.error("Workflow Failed", {
             description: eventData.error,
           });
           setMode("failed");
+          setOutput({ status: "failed", result: eventData.error });
         }
 
         if (message.event_type === "approval.requested") {
@@ -131,5 +135,6 @@ export function useWorkflowWebSocket(
     setWsConnected,
     setMode,
     setCurrentApproval,
+    setOutput,
   ]);
 }

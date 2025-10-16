@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { NarrationModal } from "@/components/modals/narration";
+import { OutputPanel } from "@/components/sidebar/output";
 
 export default function WorkflowEditorPage({
   params,
@@ -113,9 +114,9 @@ export default function WorkflowEditorPage({
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="fixed top-20 left-4 bottom-4 w-80 bg-transparent rounded-2xl border flex flex-col"
           >
-            {mode.startsWith("execut") ||
-            mode.startsWith("complet") ||
-            mode.startsWith("fail") ? (
+            {mode === "completed" || mode === "failed" ? (
+              <OutputPanel />
+            ) : mode.startsWith("execut") ? (
               <EventLogStream
                 onViewReport={() => {
                   fetchNarration();

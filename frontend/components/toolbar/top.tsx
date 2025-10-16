@@ -32,6 +32,7 @@ export function ExecutionToolbar() {
     toggleLeftSidebar,
     toggleRightSidebar,
     leftSidebarOpen,
+    addEvent,
     rightSidebarOpen,
     setNodes,
     setEdges,
@@ -51,12 +52,26 @@ export function ExecutionToolbar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input_data: inputData }),
-      }).then((res) =>
-        res.ok
-          ? res.json()
-          : Promise.reject(new Error("Failed to start execution."))
-      );
+      }).then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json();
+          if (errorData.errors) {
+            toggleLeftSidebar();
+            addEvent({
+              id: `validation-error-${Date.now()}`,
+              workflowId: workflowId || "",
+              executionId: "",
+              eventType: "failed",
+              timestamp: new Date().toISOString(),
+              data: { errors: errorData.errors },
+            });
+          }
+          return Promise.reject(new Error("Failed to start execution."));
+        }
+        return res.json();
+      });
     },
+
     onSuccess: (data) => {
       toast.success("Execution started!", {
         description: `ID: ${data.execution_id}`,
