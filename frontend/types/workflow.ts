@@ -7,6 +7,8 @@ export type NodeType =
   | "agent"
   | "action"
   | "approval"
+  | "hitl"
+  | "conditional"
   | "eval"
   | "fork"
   | "merge"

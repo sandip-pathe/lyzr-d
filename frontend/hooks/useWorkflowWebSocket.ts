@@ -47,14 +47,14 @@ export function useWorkflowWebSocket(
     ws.onmessage = (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
-        const eventData = JSON.parse(message.data); // Parse the inner data string
+        const eventData = JSON.parse(message.data);
 
         const executionEvent: ExecutionEvent = {
           id: `${eventData.node_id}-${message.timestamp}`,
           workflowId: eventData.workflow_id,
           executionId: eventData.execution_id,
           nodeId: eventData.node_id,
-          eventType: message.event_type.split(".")[1] as any, // "node.completed" -> "completed"
+          eventType: message.event_type.split(".")[1] as any,
           timestamp: new Date(
             parseFloat(message.timestamp) * 1000
           ).toISOString(),
@@ -63,7 +63,6 @@ export function useWorkflowWebSocket(
 
         addEvent(executionEvent);
 
-        // Update node status based on event
         if (executionEvent.nodeId) {
           if (executionEvent.eventType === "started") {
             updateNodeStatus(executionEvent.nodeId, "running");
@@ -74,7 +73,6 @@ export function useWorkflowWebSocket(
           }
         }
 
-        // Handle workflow-level events
         if (message.event_type === "workflow.completed") {
           toast.success("Workflow Completed Successfully!");
           setMode("completed");
@@ -89,14 +87,12 @@ export function useWorkflowWebSocket(
         }
 
         if (message.event_type === "approval.requested") {
-          // You might need to fetch the full approval details
-          // For now, let's assume the necessary data is in the event
           const approvalRequest: ApprovalRequest = {
             id: eventData.approval_id,
             executionId: eventData.execution_id,
             nodeId: eventData.node_id,
-            description: "Please review and approve.", // This should come from the backend
-            context: {}, // This should also come from the backend
+            description: "Please review and approve.",
+            context: {},
             status: "pending",
             requestedAt: new Date().toISOString(),
           };
@@ -120,7 +116,6 @@ export function useWorkflowWebSocket(
 
     wsRef.current = ws;
 
-    // Cleanup on component unmount or when executionId changes
     return () => {
       if (wsRef.current) {
         wsRef.current.close();

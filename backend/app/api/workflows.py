@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from temporalio.client import Client, WorkflowHandle
+from temporalio.client import Client
 from uuid import uuid4
 from app.core.database import get_db
 from app.core.config import settings
@@ -82,7 +82,8 @@ async def execute_workflow(
         input_data=execute_request.input_data
     )
     
-    errors = validate_workflow(workflow.dict())
+    # FIX: Pass the workflow.definition to the validation function
+    errors = validate_workflow(workflow.definition)
     if errors:
         raise HTTPException(
             status_code=400,

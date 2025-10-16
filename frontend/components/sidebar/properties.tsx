@@ -192,7 +192,22 @@ export function PropertiesPanel() {
             </div>
           </>
         );
+
       case "approval":
+        return (
+          <div className="space-y-2">
+            <Label>Prompt</Label>
+            <Textarea
+              value={localConfig.prompt || ""}
+              onChange={(e) => handleConfigUpdate("prompt", e.target.value)}
+              placeholder="Enter the approval question for the user..."
+              rows={3}
+            />
+          </div>
+        );
+
+      // NEW: HITL Configuration (old approval logic)
+      case "hitl":
         return (
           <>
             <div className="space-y-2">
@@ -215,26 +230,42 @@ export function PropertiesPanel() {
                 value={localConfig.approvalType || "any"}
                 onValueChange={(v) => handleConfigUpdate("approvalType", v)}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any (first approval wins)</SelectItem>
-                  <SelectItem value="all">All (unanimous)</SelectItem>
-                </SelectContent>
+                {/* ... Select options */}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Timeout (hours)</Label>
-              <Input
-                type="number"
-                value={localConfig.timeout || 24}
-                onChange={(e) =>
-                  handleConfigUpdate("timeout", parseInt(e.target.value))
-                }
-              />
-            </div>
+            {/* ... other HITL config fields */}
           </>
+        );
+
+      // NEW: Conditional Node Configuration
+      case "conditional":
+        return (
+          <div className="space-y-2">
+            <Label>Conditions</Label>
+            <Textarea
+              value={
+                localConfig.conditions
+                  ? JSON.stringify(localConfig.conditions, null, 2)
+                  : '[\n  {\n    "condition": "output.status == \\"success\\"",\n    "target_id": "node-id-if-true"\n  }\n]'
+              }
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  handleConfigUpdate("conditions", parsed);
+                } catch (err) {
+                  // Handle invalid JSON
+                }
+              }}
+              placeholder="Define conditions and target node IDs"
+              rows={6}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-gray-500">
+              Define a list of conditions. The first one that evaluates to true
+              will be followed. Use &aspo;output to reference the previous nodes
+              result.
+            </p>
+          </div>
         );
       case "eval":
         return (
@@ -325,27 +356,20 @@ export function PropertiesPanel() {
   };
 
   return (
-    <div className="h-full bg-black rounded-2xl text-white overflow-y-auto">
+    <div
+      className="h-full text-white overflow-y-auto"
+      style={{ scrollbarWidth: "none" }}
+    >
       <div className="p-4 border-b border-gray-600 bg-black">
         <div className="flex items-center bg-inherit gap-2">
           <Settings className="w-5 h-5 text-purple-600" />
-          <h2 className="font-semibold text-lg text-white">Configurations</h2>
+          <h2 className="font-semibold text-lg text-white">
+            {selectedNode.type.toUpperCase()}
+          </h2>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
-        <div className="space-y-2">
-          <Label>Node ID</Label>
-          <Input
-            value={selectedNode.id}
-            disabled
-            className="font-mono text-xs"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Node Type</Label>
-          <Input value={selectedNode.type.toUpperCase()} disabled />
-        </div>
         <div className="space-y-2">
           <Label>Label</Label>
           <Input
@@ -358,7 +382,7 @@ export function PropertiesPanel() {
         <Separator />
 
         <div className="space-y-4">
-          <h3 className="font-semibold text-sm text-gray-700">Configuration</h3>
+          <h3 className="font-semibold text-sm">Configuration</h3>
           {renderConfigFields(selectedNode)}
         </div>
 

@@ -8,6 +8,8 @@ class NodeType(str, Enum):
     AGENT = "agent"
     ACTION = "action"
     APPROVAL = "approval"
+    CONDITIONAL = "conditional"
+    HITL = "hitl"
     EVAL = "eval"
     FORK = "fork"
     MERGE = "merge"
@@ -39,12 +41,18 @@ class ActionConfig(BaseModel):
     idempotency_key: Optional[str] = None
 
 class ApprovalConfig(BaseModel):
+    prompt: str = Field("Do you approve this step?", description="The question to display in the UI pop-up.")
+
+class HITLConfig(BaseModel):
     approvers: List[str]
     approval_type: str = Field("any", description="any|all|majority")
     channels: List[str] = ["slack", "email"]
     email_provider: str = Field("resend", description="resend|mailchimp|sendgrid")
     timeout_hours: int = 24
     escalation_approvers: Optional[List[str]] = None
+
+class ConditionalConfig(BaseModel):
+    conditions: List[Dict[str, str]] = Field(..., description="List of conditions and target node IDs")
 
 class EvalConfig(BaseModel):
     eval_type: str = Field(..., description="schema|llm_judge|policy|custom")
@@ -84,6 +92,8 @@ NODE_TYPE_SCHEMAS = {
     NodeType.AGENT: AgentConfig,
     NodeType.ACTION: ActionConfig,
     NodeType.APPROVAL: ApprovalConfig,
+    NodeType.CONDITIONAL: ConditionalConfig,
+    NodeType.HITL: HITLConfig,
     NodeType.EVAL: EvalConfig,
     NodeType.FORK: ForkConfig,
     NodeType.MERGE: MergeConfig,
@@ -95,7 +105,7 @@ NODE_TYPE_SCHEMAS = {
 def get_node_type_info(node_type: str) -> Dict[str, Any]:
     """Get JSON schema for node type"""
     try:
-        node_type_enum = NodeType(node_type)  # Convert str to NodeType
+        node_type_enum = NodeType(node_type)
     except ValueError:
         return {}
 

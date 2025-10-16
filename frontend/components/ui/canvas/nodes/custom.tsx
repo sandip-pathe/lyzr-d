@@ -36,6 +36,7 @@ const iconMap: { [key: string]: React.ElementType } = {
   event: Radio,
   meta: Eye,
 };
+
 const colorMap: { [key: string]: string } = {
   trigger: "bg-green-500",
   agent: "bg-purple-500",
@@ -48,6 +49,7 @@ const colorMap: { [key: string]: string } = {
   event: "bg-red-500",
   meta: "bg-gray-500",
 };
+
 const statusConfig: { [key: string]: any } = {
   idle: { color: "bg-white border-gray-300", icon: null, pulse: false },
   running: { color: "bg-blue-50 border-blue-400", icon: Loader2, pulse: true },

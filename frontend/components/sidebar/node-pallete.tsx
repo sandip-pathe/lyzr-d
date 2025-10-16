@@ -4,16 +4,19 @@ import { motion } from "framer-motion";
 import { nodeTemplates } from "@/lib/mock-data";
 import { NodeType } from "@/types/workflow";
 import {
-  Zap,
   Bot,
   Globe,
-  UserCheck,
   Target,
-  GitFork,
-  GitMerge,
+  CheckCheck,
   Clock,
   Radio,
   Eye,
+  Merge,
+  Split,
+  UserRoundCheck,
+  Play,
+  GitBranchPlus,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +24,12 @@ const iconComponents = {
   trigger: Zap,
   agent: Bot,
   action: Globe,
-  approval: UserCheck,
+  approval: CheckCheck,
+  hitl: UserRoundCheck,
+  conditional: GitBranchPlus,
   eval: Target,
-  fork: GitFork,
-  merge: GitMerge,
+  fork: Split,
+  merge: Merge,
   timer: Clock,
   event: Radio,
   meta: Eye,
@@ -38,17 +43,17 @@ export function NodePalette() {
 
   return (
     <div
-      className="h-full bg-black border-r border-gray-200 rounded-2xl overflow-y-auto"
+      className="h-full border-r bg-transparent overflow-y-auto"
       style={{
         scrollbarWidth: "none",
       }}
     >
-      <div className="p-4 border-b border-gray-200 bg-black">
+      <div className="p-4 border-b border-gray-200">
         <h2 className="font-semibold text-lg text-white">Components</h2>
         <p className="text-xs text-gray-400 mt-1">Drag and drop to canvas</p>
       </div>
 
-      <div className="p-3 space-y-2">
+      <div className="px-8 py-2 space-y-2">
         {nodeTemplates.map((template, index) => {
           const IconComponent = iconComponents[template.type as NodeType];
 
@@ -59,32 +64,28 @@ export function NodePalette() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
               draggable
-              onDragStart={(e) => onDragStart(e as any, template.type)} // Cast the event
+              onDragStart={(e) => onDragStart(e as any, template.type)}
               className={cn(
-                "p-3 border-gray-200 bg-white",
+                "p-2 bg-transparent",
                 "cursor-grab active:cursor-grabbing",
-                "hover:border-gray-300 hover:shadow-md",
+                "hover:border-gray-300 hover:bg-white hover:shadow-md",
                 "transition-all duration-200",
                 "group"
               )}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start justify-center gap-3">
                 <div
                   className={cn(
-                    "p-2 rounded-md",
+                    "p-1 rounded-md",
                     template.color,
                     "group-hover:scale-110 transition-transform"
                   )}
                 >
-                  <IconComponent className="w-5 h-5 text-white" />
+                  <IconComponent className="w-4 h-4 text-white" />
                 </div>
-
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm text-gray-900">
+                  <div className="font-medium text-sm text-gray-500">
                     {template.label}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-0.5">
-                    {template.description}
                   </div>
                 </div>
               </div>

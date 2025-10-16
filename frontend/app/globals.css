@@ -39,7 +39,7 @@
 
 /* Custom styles for React Flow components */
 .react-flow__controls {
-  @apply bg-black rounded-lg border-none p-1;
+  @apply bg-black fixed bottom-4 left-1/2 transform -translate-x-1/2 rounded-lg border-none p-1;
 }
 .react-flow__controls button {
   @apply bg-transparent hover:bg-gray-900 transition-colors w-8 h-8;

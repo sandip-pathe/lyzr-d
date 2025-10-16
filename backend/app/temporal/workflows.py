@@ -6,6 +6,7 @@ from temporalio.exceptions import ApplicationError, ActivityError
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
 import asyncio
+from backend.app.temporal.activities import request_ui_approval
 
 
 with workflow.unsafe.imports_passed_through():
@@ -160,13 +161,11 @@ class OrchestrationWorkflow:
         node_type = node.get("type", "unknown")
         node_id = node.get("id", "")
 
-        # Build execution context
         execution_context = {
             **self.current_state,
             "current_node_id": node_id
         }
 
-        # Route to appropriate activity based on node type
         if node_type == "agent":
             return await workflow.execute_activity(
                 execute_agent_node,
@@ -189,14 +188,28 @@ class OrchestrationWorkflow:
             )
 
         elif node_type == "approval":
-            # Send approval request
+            await workflow.execute_activity(
+                request_ui_approval,
+                args=[node, execution_context],
+                start_to_close_timeout=timedelta(seconds=30)
+            )
+
+            await workflow.wait_condition(lambda: self.approval_received)
+            
+            self.approval_received = False # Reset for next approval
+            if self.approval_data and self.approval_data.get("action") == "reject":
+                raise ApplicationError("Approval rejected by user in UI.", non_retryable=True)
+            
+            return self.approval_data
+
+        elif node_type == "hitl":
+            # This is the old "approval" logic
             await workflow.execute_activity(
                 send_approval_request,
                 args=[node, execution_context],
                 start_to_close_timeout=timedelta(seconds=30)
             )
 
-            # Wait for approval signal with timeout
             timeout_hours = node.get("data", {}).get("timeout_hours", 24)
             try:
                 await workflow.wait_condition(
@@ -204,14 +217,16 @@ class OrchestrationWorkflow:
                     timeout=timedelta(hours=timeout_hours)
                 )
             except asyncio.TimeoutError:
-                raise ApplicationError(  # ✅ Using correct import
-                    f"Approval timeout after {timeout_hours} hours",
-                    non_retryable=True
-                )
+                raise ApplicationError(f"HITL approval timeout after {timeout_hours} hours", non_retryable=True)
 
-            # Reset approval state and return data
             self.approval_received = False
             return self.approval_data
+
+        elif node_type == "conditional":
+            # This node type doesn't execute an activity.
+            # Its logic is handled in the _get_next_node method.
+            workflow.logger.info(f"Evaluating conditions for node {node_id}")
+            return {"status": "conditions evaluated"}
 
         elif node_type == "eval":
             result = await workflow.execute_activity(
@@ -301,7 +316,6 @@ class OrchestrationWorkflow:
             )
 
         elif node_type == "trigger":
-            # Trigger nodes just mark the start
             return {"triggered": True, "timestamp": workflow.now().isoformat()}
 
         else:
@@ -419,29 +433,36 @@ class OrchestrationWorkflow:
         """Determine next node based on edges and conditions"""
         
         current_id = current_node.get("id", "")
+        node_type = current_node.get("type")
 
-        # Find outgoing edges
+
+        if node_type == "conditional":
+            conditions = current_node.get("data", {}).get("config", {}).get("conditions", [])
+            for condition_item in conditions:
+                condition = condition_item.get("condition")
+                target_id = condition_item.get("target_id")
+                if condition and target_id and self._evaluate_condition(condition, result):
+                    return target_id
+            # Fallback to the 'else' or default edge if no condition matches
+            default_edge = next((e for e in edges if e.get("source") == current_id and not e.get("condition")), None)
+            return default_edge.get("target") if default_edge else None
+        
+                # Find outgoing edges
         outgoing_edges = [e for e in edges if e.get("source") == current_id]
 
         if not outgoing_edges:
             return None
-        # This is a basic implementation. For production, a safer expression parser is recommended.
-        # Note: This uses eval and should be used with caution if conditions are user-provided.
 
         # Evaluate conditional edges
         for edge in outgoing_edges:
             condition = edge.get("condition")
-            
             if not condition:
-                # No condition, take this edge
-                return edge.get("target")
-
-            # Evaluate condition
+                continue
             if self._evaluate_condition(condition, result):
                 return edge.get("target")
-
-        # No condition matched, take first edge
-        return outgoing_edges[0].get("target") if outgoing_edges else None
+            
+        unconditional_edge = next((e for e in outgoing_edges if not e.get("condition")), None)
+        return unconditional_edge.get("target") if unconditional_edge else None
 
     def _evaluate_condition(self, condition: str, data: Any) -> bool:
         """Safely evaluate edge condition"""

@@ -31,10 +31,9 @@ async def lifespan(app: FastAPI):
     yield
     print("👋 Lyzr Orchestrator API shutting down...")
 
-# Create the app *after* defining lifespan
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
-# CORS middleware
+# CORS 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -43,7 +42,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
 app.include_router(workflows.router)
 app.include_router(approvals.router)
 app.include_router(executions.router)
@@ -99,8 +97,6 @@ async def health():
         "redis": "ok" if redis_ok else "error",
     }
 
-
-# NEW: Add this function at the end of the file
 async def update_execution_status_on_event(event_data: dict):
     """Listen for workflow completion/failure events and update the DB."""
     from app.core.database import SessionLocal

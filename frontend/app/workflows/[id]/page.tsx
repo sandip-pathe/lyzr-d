@@ -112,7 +112,7 @@ export default function WorkflowEditorPage({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-20 left-4 bottom-4 w-80 bg-transparent rounded-2xl border flex flex-col"
+            className="fixed top-0 left-0 bottom-0 w-72 bg-black flex flex-col"
           >
             {mode === "completed" || mode === "failed" ? (
               <OutputPanel />
@@ -137,7 +137,7 @@ export default function WorkflowEditorPage({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-20 right-4 bottom-4 w-96 bg-transparent rounded-2xl flex flex-col"
+            className="fixed top-0 right-0 bottom-0 w-72 bg-black flex flex-col"
           >
             <PropertiesPanel />
           </motion.div>

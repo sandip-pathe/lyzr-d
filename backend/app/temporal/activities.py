@@ -276,3 +276,20 @@ async def publish_workflow_status(execution_id: str, workflow_id: str, status: s
         "error": error
     }
     await event_bus.publish(event_type, data)
+
+@activity.defn
+async def request_ui_approval(node: dict, state: dict) -> dict:
+    """Publish an event for the UI to catch for a simple approval."""
+    node_id = node.get("id")
+    prompt = node.get("data", {}).get("config", {}).get("prompt", "Do you approve?")
+    
+    await event_bus.publish("ui.approval.requested", {
+        "workflow_id": state.get("workflow_id"),
+        "execution_id": state.get("execution_id"),
+        "node_id": node_id,
+        "prompt": prompt,
+        "context": state.get("previous_output", {}) # Pass previous node output as context
+    })
+    
+    activity.logger.info(f"UI approval request sent for node {node_id}")
+    return {"status": "ui_approval_sent"}
