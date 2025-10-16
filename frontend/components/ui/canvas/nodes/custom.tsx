@@ -133,7 +133,7 @@ export const CustomNode = memo(
           >
             <div className="px-3 py-2 bg-white rounded-b-md text-xs text-gray-600">
               <p className="font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-500 w-full truncate">
-                {String(data.id)}
+                {statusInfo.label || "Idle"}
               </p>
               {data.error && (
                 <p className="mt-2 text-red-600 flex items-start gap-1">
@@ -156,4 +156,5 @@ export const CustomNode = memo(
     );
   }
 );
+
 CustomNode.displayName = "CustomNode";

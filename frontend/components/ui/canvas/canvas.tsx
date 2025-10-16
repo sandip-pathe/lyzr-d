@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -59,22 +59,13 @@ function WorkflowCanvasInner() {
   const { screenToFlowPosition } = useReactFlow();
   const connectingNodeId = useRef<string | null>(null);
 
-  const handleNodesChange = useCallback(
-    (changes: any) => {
-      onNodesChange(changes);
-      setStoreNodes(nodes as WorkflowNode[]);
-    },
-    [nodes, onNodesChange, setStoreNodes]
-  );
+  useEffect(() => {
+    setNodes(storeNodes);
+  }, [storeNodes, setNodes]);
 
-  const handleEdgesChange = useCallback(
-    (changes: any) => {
-      onEdgesChange(changes);
-      // React Flow's `edges` state is of type `Edge[]`, cast it to `WorkflowEdge[]` for your store
-      setStoreEdges(edges as WorkflowEdge[]);
-    },
-    [edges, onEdgesChange, setStoreEdges]
-  );
+  useEffect(() => {
+    setEdges(storeEdges as Edge[]);
+  }, [storeEdges, setEdges]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -84,12 +75,9 @@ function WorkflowCanvasInner() {
         type: "smoothstep",
         animated: mode === "executing",
       };
-      const newEdges = addEdge(edge, edges);
-      setEdges(newEdges);
-      // Cast the new array of edges to `WorkflowEdge[]` for your store
-      setStoreEdges(newEdges as WorkflowEdge[]);
+      setStoreEdges(addEdge(edge, storeEdges) as WorkflowEdge[]);
     },
-    [edges, setEdges, setStoreEdges, mode]
+    [storeEdges, setStoreEdges, mode]
   );
 
   const onNodeClick = useCallback(
@@ -137,13 +125,10 @@ function WorkflowCanvasInner() {
       };
 
       addNode(newNode);
-      // Now you can add it directly without casting issues
-      setNodes((nds) => [...nds, newNode]);
     },
-    [screenToFlowPosition, addNode, setNodes]
+    [screenToFlowPosition, addNode]
   );
 
-  // Auto-layout toggle
   const handleLayoutToggle = useCallback(() => {
     setLayoutType(layoutType === "dag" ? "event-hub" : "dag");
   }, [layoutType, setLayoutType]);
@@ -153,8 +138,8 @@ function WorkflowCanvasInner() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
@@ -176,7 +161,6 @@ function WorkflowCanvasInner() {
         <Background color="#94a3b8" gap={15} />
         <Controls />
         <MiniMap
-          color="#000000"
           nodeColor={(node) => {
             const colors = {
               trigger: "#22c55e",
@@ -192,7 +176,6 @@ function WorkflowCanvasInner() {
             };
             return colors[node.type as NodeType] || "#6b7280";
           }}
-          className="!bg-black !border-2 !border-black"
         />
 
         {/* Layout Toggle Panel */}

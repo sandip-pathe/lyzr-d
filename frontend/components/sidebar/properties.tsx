@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Settings, Trash2, Copy } from "lucide-react";
 import { WorkflowNode } from "@/types/workflow";
@@ -32,15 +31,7 @@ export function PropertiesPanel() {
   }, [selectedNode]);
 
   if (!selectedNode) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 p-8 bg-black rounded-2xl">
-        <Settings className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <p className="text-sm font-medium">No node selected</p>
-        <p className="text-xs mt-2">
-          Select a node to view and edit its properties.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const handleConfigUpdate = (key: string, value: any) => {
@@ -66,6 +57,51 @@ export function PropertiesPanel() {
 
   const renderConfigFields = (node: WorkflowNode) => {
     switch (node.type) {
+      case "trigger":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Trigger Type</Label>
+              <Select
+                value={localConfig.trigger_type || "on_run"}
+                onValueChange={(v) => handleConfigUpdate("trigger_type", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on_run">On Run</SelectItem>
+                  <SelectItem value="after_hours">After Hours</SelectItem>
+                  <SelectItem value="select_date">Select Date</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {localConfig.trigger_type === "after_hours" && (
+              <div className="space-y-2">
+                <Label>Hours</Label>
+                <Input
+                  type="number"
+                  value={localConfig.hours || 1}
+                  onChange={(e) =>
+                    handleConfigUpdate("hours", parseInt(e.target.value))
+                  }
+                />
+              </div>
+            )}
+            {localConfig.trigger_type === "select_date" && (
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={
+                    localConfig.date || new Date().toISOString().split("T")[0]
+                  }
+                  onChange={(e) => handleConfigUpdate("date", e.target.value)}
+                />
+              </div>
+            )}
+          </>
+        );
       case "agent":
         return (
           <>
@@ -216,6 +252,7 @@ export function PropertiesPanel() {
                   <SelectItem value="schema">Schema Validation</SelectItem>
                   <SelectItem value="llm_judge">LLM Judge</SelectItem>
                   <SelectItem value="policy">Policy Check</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
               </Select>
             </div>

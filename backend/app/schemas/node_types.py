@@ -16,9 +16,9 @@ class NodeType(str, Enum):
     META = "meta"
 
 class TriggerConfig(BaseModel):
-    trigger_type: str = Field(..., description="time|event|api")
-    cron: Optional[str] = Field(None, description="Cron expression for scheduled triggers")
-    event_channel: Optional[str] = Field(None, description="Redis channel to listen to")
+    trigger_type: str = Field("on_run", description="on_run|after_hours|select_date")
+    hours: Optional[int] = Field(None, description="Number of hours to wait before triggering")
+    date: Optional[str] = Field(None, description="Date to trigger the workflow")
 
 class AgentConfig(BaseModel):
     provider: str = Field(..., description="openai|lyzr|custom")
@@ -53,6 +53,7 @@ class EvalConfig(BaseModel):
     policy_rules: Optional[List[Dict[str, Any]]] = None
     llm_judge_prompt: Optional[str] = None
     on_failure: str = Field("block", description="block|warn|retry|compensate")
+    criteria: Optional[str] = None
 
 class ForkConfig(BaseModel):
     branches: List[List[str]] = Field(..., description="List of node ID lists for each branch")
@@ -97,7 +98,7 @@ def get_node_type_info(node_type: str) -> Dict[str, Any]:
         node_type_enum = NodeType(node_type)  # Convert str to NodeType
     except ValueError:
         return {}
-    
+
     schema_class = NODE_TYPE_SCHEMAS[node_type_enum]
     return {
         "type": node_type,

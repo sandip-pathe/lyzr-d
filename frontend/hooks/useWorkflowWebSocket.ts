@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ExecutionEvent } from "@/types/workflow";
+import { ApprovalRequest, ExecutionEvent } from "@/types/workflow";
 import { useWorkflowStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -16,8 +16,13 @@ export function useWorkflowWebSocket(
   enabled: boolean = true
 ) {
   const wsRef = useRef<WebSocket | null>(null);
-  const { addEvent, updateNodeStatus, setWsConnected, setMode } =
-    useWorkflowStore();
+  const {
+    addEvent,
+    updateNodeStatus,
+    setWsConnected,
+    setMode,
+    setCurrentApproval,
+  } = useWorkflowStore();
 
   useEffect(() => {
     if (!executionId || !enabled) {
@@ -78,6 +83,21 @@ export function useWorkflowWebSocket(
           });
           setMode("failed");
         }
+
+        if (message.event_type === "approval.requested") {
+          // You might need to fetch the full approval details
+          // For now, let's assume the necessary data is in the event
+          const approvalRequest: ApprovalRequest = {
+            id: eventData.approval_id,
+            executionId: eventData.execution_id,
+            nodeId: eventData.node_id,
+            description: "Please review and approve.", // This should come from the backend
+            context: {}, // This should also come from the backend
+            status: "pending",
+            requestedAt: new Date().toISOString(),
+          };
+          setCurrentApproval(approvalRequest);
+        }
       } catch (error) {
         console.error("[WebSocket] Failed to parse message:", error);
       }
@@ -110,5 +130,6 @@ export function useWorkflowWebSocket(
     updateNodeStatus,
     setWsConnected,
     setMode,
+    setCurrentApproval,
   ]);
 }

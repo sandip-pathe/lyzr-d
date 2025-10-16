@@ -61,7 +61,7 @@ export function NodePalette() {
               draggable
               onDragStart={(e) => onDragStart(e as any, template.type)} // Cast the event
               className={cn(
-                "p-3 rounded-lg border-gray-200 bg-white",
+                "p-3 border-gray-200 bg-white",
                 "cursor-grab active:cursor-grabbing",
                 "hover:border-gray-300 hover:shadow-md",
                 "transition-all duration-200",

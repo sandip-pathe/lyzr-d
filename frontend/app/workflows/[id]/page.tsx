@@ -14,6 +14,7 @@ import { ExecutionToolbar } from "@/components/toolbar/top";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { NarrationModal } from "@/components/modals/narration";
 
 export default function WorkflowEditorPage({
   params,
@@ -24,6 +25,7 @@ export default function WorkflowEditorPage({
     mode,
     leftSidebarOpen,
     rightSidebarOpen,
+    selectedNodeId,
     setWorkflowId,
     executionId,
     currentApproval,
@@ -109,7 +111,7 @@ export default function WorkflowEditorPage({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-20 left-4 bottom-4 w-80 bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl border flex flex-col"
+            className="fixed top-20 left-4 bottom-4 w-80 bg-transparent rounded-2xl border flex flex-col"
           >
             {mode.startsWith("execut") ||
             mode.startsWith("complet") ||
@@ -128,13 +130,13 @@ export default function WorkflowEditorPage({
       </AnimatePresence>
 
       <AnimatePresence>
-        {rightSidebarOpen && (
+        {rightSidebarOpen && selectedNodeId && (
           <motion.div
             initial={{ x: "100%", opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-20 right-4 bottom-4 w-96 bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl border flex flex-col"
+            className="fixed top-20 right-4 bottom-4 w-96 bg-transparent rounded-2xl flex flex-col"
           >
             <PropertiesPanel />
           </motion.div>
@@ -152,13 +154,12 @@ export default function WorkflowEditorPage({
         }
         approval={currentApproval}
       />
-      {/* You would need to create this NarrationModal component */}
-      {/* <NarrationModal
+      <NarrationModal
         open={isNarrationModalOpen}
         onClose={() => setIsNarrationModalOpen(false)}
         narration={narrationData?.narration}
         isLoading={isNarrationLoading}
-      /> */}
+      />
     </div>
   );
 }

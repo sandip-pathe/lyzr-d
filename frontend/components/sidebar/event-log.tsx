@@ -22,10 +22,10 @@ const eventIcons: Record<string, typeof Activity> = {
 };
 
 const eventColors: Record<string, string> = {
-  started: "text-blue-600 bg-blue-50",
-  completed: "text-green-600 bg-green-50",
-  failed: "text-red-600 bg-red-50",
-  approval_requested: "text-orange-600 bg-orange-50",
+  started: "text-blue-400 bg-blue-900/50",
+  completed: "text-green-400 bg-green-900/50",
+  failed: "text-red-400 bg-red-900/50",
+  approval_requested: "text-orange-400 bg-orange-900/50",
 };
 
 export function EventLogStream({
@@ -52,15 +52,13 @@ export function EventLogStream({
   };
 
   return (
-    <div className="h-full bg-white border-r border-gray-200 flex flex-col">
+    <div className="h-full bg-black border-r border-gray-700 flex flex-col rounded-2xl">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+      <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-lg text-gray-900">
-              Event Stream
-            </h2>
-            <p className="text-xs text-gray-600 mt-1">
+            <h2 className="font-semibold text-lg text-white">Event Stream</h2>
+            <p className="text-xs text-gray-400 mt-1">
               Real-time execution log
             </p>
           </div>
@@ -71,7 +69,7 @@ export function EventLogStream({
                 wsConnected ? "bg-green-500 animate-pulse" : "bg-gray-400"
               )}
             />
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-gray-400">
               {wsConnected ? "Connected" : "Disconnected"}
             </span>
           </div>
@@ -82,7 +80,7 @@ export function EventLogStream({
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         <AnimatePresence initial={false}>
           {events.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <Activity className="w-12 h-12 mb-2" />
               <p className="text-sm">No events yet</p>
               <p className="text-xs mt-1">
@@ -93,7 +91,7 @@ export function EventLogStream({
             events.map((event, index) => {
               const Icon = eventIcons[event.eventType] || Activity;
               const colorClass =
-                eventColors[event.eventType] || "text-gray-600 bg-gray-50";
+                eventColors[event.eventType] || "text-gray-400 bg-gray-800";
 
               return (
                 <motion.div
@@ -103,8 +101,8 @@ export function EventLogStream({
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: index * 0.02 }}
                   className={cn(
-                    "p-3 rounded-lg border border-gray-200",
-                    "hover:shadow-md transition-shadow"
+                    "p-3 rounded-lg border border-gray-700 bg-gray-900/50",
+                    "hover:bg-gray-800/50 transition-colors"
                   )}
                 >
                   <div className="flex items-start gap-3">
@@ -114,7 +112,7 @@ export function EventLogStream({
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-gray-200">
                           {event.eventType.replace("_", " ").toUpperCase()}
                         </span>
                         <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -123,18 +121,21 @@ export function EventLogStream({
                         </span>
                       </div>
 
-                      <div className="text-xs text-gray-600">
-                        Node: <span className="font-mono">{event.nodeId}</span>
+                      <div className="text-xs text-gray-400">
+                        Node:{" "}
+                        <span className="font-mono text-gray-300">
+                          {event.nodeId}
+                        </span>
                       </div>
 
                       {event.data && (
-                        <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono text-gray-700 overflow-x-auto">
+                        <div className="mt-2 p-2 bg-black rounded text-xs font-mono text-gray-300 overflow-x-auto">
                           {JSON.stringify(event.data, null, 2)}
                         </div>
                       )}
 
                       {event.error && (
-                        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-700">
+                        <div className="mt-2 p-2 bg-red-900/50 rounded text-xs text-red-300">
                           {event.error}
                         </div>
                       )}
@@ -148,9 +149,15 @@ export function EventLogStream({
       </div>
 
       {/* Footer Stats */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between text-xs text-gray-600">
+      <div className="p-3 border-t border-gray-700 bg-black">
+        <div className="flex items-center justify-between text-xs text-gray-400">
           <span>Total Events: {events.length}</span>
+          <button
+            onClick={() => onViewReport(events[0])}
+            className="text-blue-400 hover:underline"
+          >
+            View Narration
+          </button>
           <span className="flex items-center gap-1">
             <Activity className="w-3 h-3" />
             Live
