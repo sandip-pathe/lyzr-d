@@ -17,12 +17,7 @@ import {
   Panel,
   ReactFlowProvider,
 } from "@xyflow/react";
-import {
-  WorkflowNode,
-  NodeType,
-  WorkflowEdge,
-  NodeData,
-} from "@/types/workflow";
+import { WorkflowNode, NodeType, WorkflowEdge } from "@/types/workflow";
 import "@xyflow/react/dist/style.css";
 import { Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -181,6 +176,7 @@ function WorkflowCanvasInner() {
         <Background color="#94a3b8" gap={15} />
         <Controls />
         <MiniMap
+          color="#000000"
           nodeColor={(node) => {
             const colors = {
               trigger: "#22c55e",
@@ -196,7 +192,7 @@ function WorkflowCanvasInner() {
             };
             return colors[node.type as NodeType] || "#6b7280";
           }}
-          className="!bg-white !border-2 !border-gray-200"
+          className="!bg-black !border-2 !border-black"
         />
 
         {/* Layout Toggle Panel */}

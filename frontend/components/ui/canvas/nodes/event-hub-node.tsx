@@ -17,17 +17,15 @@ export const EventHubNode = memo(
         animate={{ scale: 1 }}
         className="relative"
       >
-        {/* Central Hub Circle */}
         <div
           className={`
-        relative w-48 h-48 rounded-full
-        bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500
-        shadow-2xl border-4 border-white
-        ${selected ? "ring-4 ring-blue-500" : ""}
-        ${data.status === "running" ? "animate-pulse" : ""}
-      `}
+            relative w-48 h-48 rounded-full
+            bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500
+            shadow-2xl border-4 border-white
+            ${selected ? "ring-4 ring-blue-500" : ""}
+            ${data.status === "running" ? "animate-pulse" : ""}
+          `}
         >
-          {/* Pulsing Rings */}
           {data.status === "running" && (
             <>
               <div className="absolute inset-0 rounded-full bg-red-400 opacity-20 animate-ping" />
@@ -38,7 +36,6 @@ export const EventHubNode = memo(
             </>
           )}
 
-          {/* Content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
             <Radio className="w-12 h-12 mb-2" />
             <div className="text-sm font-bold uppercase tracking-wider">
@@ -46,7 +43,6 @@ export const EventHubNode = memo(
             </div>
             <div className="text-xs opacity-90">{data.label}</div>
 
-            {/* Throughput Counter */}
             {throughput > 0 && (
               <div className="mt-3 px-3 py-1 bg-white/20 backdrop-blur rounded-full flex items-center gap-2">
                 <Activity className="w-3 h-3" />
@@ -57,7 +53,6 @@ export const EventHubNode = memo(
             )}
           </div>
 
-          {/* Topic Badges (orbiting) */}
           {topics.map((topic: string, idx: number) => {
             const angle = (idx / topics.length) * 360;
             const x = Math.cos((angle * Math.PI) / 180) * 120;
@@ -78,58 +73,34 @@ export const EventHubNode = memo(
           })}
         </div>
 
-        {/* Handles - 8 directions for subscribers */}
-        <Handle
-          type="target"
-          position={Position.Top}
-          className="!w-4 !h-4 !bg-red-500"
-        />
-        <Handle
-          type="source"
-          position={Position.Top}
-          id="out-n"
-          className="!w-4 !h-4 !bg-orange-500"
-          style={{ left: "60%" }}
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="out-e"
-          className="!w-4 !h-4 !bg-orange-500"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="out-se"
-          className="!w-4 !h-4 !bg-orange-500"
-          style={{ top: "70%" }}
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="out-s"
-          className="!w-4 !h-4 !bg-orange-500"
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="out-sw"
-          className="!w-4 !h-4 !bg-orange-500"
-          style={{ left: "40%" }}
-        />
-        <Handle
-          type="source"
-          position={Position.Left}
-          id="out-w"
-          className="!w-4 !h-4 !bg-orange-500"
-        />
-        <Handle
-          type="source"
-          position={Position.Left}
-          id="out-nw"
-          className="!w-4 !h-4 !bg-orange-500"
-          style={{ top: "30%" }}
-        />
+        {/* Handles for subscribers */}
+        {[...Array(8)].map((_, i) => {
+          const positionMap = [
+            Position.Top,
+            Position.Right,
+            Position.Bottom,
+            Position.Left,
+          ];
+          const position = positionMap[Math.floor(i / 2)];
+          let style = {};
+          if (i === 1) style = { left: "75%" };
+          if (i === 2) style = { top: "25%" };
+          if (i === 3) style = { top: "75%" };
+          if (i === 5) style = { left: "25%" };
+          if (i === 6) style = { top: "75%" };
+          if (i === 7) style = { top: "25%" };
+
+          return (
+            <Handle
+              key={i}
+              type={i === 0 ? "target" : "source"}
+              position={position}
+              id={`handle-${i}`}
+              className={i === 0 ? "!bg-red-500" : "!bg-orange-500"}
+              style={style}
+            />
+          );
+        })}
       </motion.div>
     );
   }

@@ -2,7 +2,7 @@
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy 
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, ActivityError
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
 import asyncio
@@ -19,8 +19,11 @@ with workflow.unsafe.imports_passed_through():
         execute_timer_node,
         execute_event_node,
         execute_meta_node,
-        publish_workflow_status # Import the new activity
+        publish_workflow_status,
+        compensate_node,
+        get_fallback_agent,
     )
+    from app.services.agent_executor import AgentExecutor
 
 
 @workflow.defn
@@ -90,6 +93,24 @@ class OrchestrationWorkflow:
 
                     # Determine next node
                     current_node_id = await self._get_next_node(node, edges, result)
+
+                except ActivityError as e:
+                    workflow.logger.error(f"❌ Node {current_node_id} failed with ActivityError: {str(e)}")
+                    
+                    if node_type == 'agent':
+                        is_rerouted = await self._handle_agent_failure(node, nodes, edges)
+                        if is_rerouted:
+                            current_node_id = self.current_state.get("next_node_id")
+                            continue 
+                    
+                    self.execution_history.append({
+                        "node_id": current_node_id,
+                        "type": node_type,
+                        "error": str(e),
+                        "status": "failed"
+                    })
+                    await self._trigger_compensation(nodes)
+                    raise
 
                 except Exception as e:
                     workflow.logger.error(f"❌ Node {current_node_id} failed: {str(e)}")
@@ -164,7 +185,7 @@ class OrchestrationWorkflow:
                 execute_http_request,
                 args=[node, execution_context],
                 start_to_close_timeout=timedelta(seconds=60),
-                retry_policy=RetryPolicy(maximum_attempts=3)  # ✅ Correct
+                retry_policy=RetryPolicy(maximum_attempts=3) 
             )
 
         elif node_type == "approval":
@@ -284,7 +305,7 @@ class OrchestrationWorkflow:
             return {"triggered": True, "timestamp": workflow.now().isoformat()}
 
         else:
-            raise ApplicationError(  # ✅ Correct
+            raise ApplicationError(
                 f"Unknown node type: {node_type}",
                 non_retryable=True
             )
@@ -309,6 +330,56 @@ class OrchestrationWorkflow:
 
         return result
 
+    async def _handle_agent_failure(self, failed_node: Dict[str, Any], nodes: List[Dict], edges: List[Dict]) -> bool:
+            """Attempt to self-heal by finding a fallback agent."""
+            workflow.logger.info(f"Attempting self-healing for agent node: {failed_node.get('id')}")
+            node_data = failed_node.get("data", {})
+            provider = node_data.get("config", {}).get("provider")
+            failed_agent_id = node_data.get("config", {}).get("agent_id")
+
+            # Get all agent IDs for the same provider from the workflow definition
+            all_agent_ids = [
+                n.get("data", {}).get("config", {}).get("agent_id")
+                for n in nodes
+                if n.get("type") == "agent" and n.get("data", {}).get("config", {}).get("provider") == provider
+            ]
+
+            fallback_agent_id = await workflow.execute_activity(
+                get_fallback_agent,
+                args=[provider, failed_agent_id, all_agent_ids],
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+
+            if fallback_agent_id:
+                workflow.logger.info(f"Found fallback agent: {fallback_agent_id}. Rerouting.")
+                # Create a new, temporary node definition for the fallback agent
+                fallback_node = failed_node.copy()
+                fallback_node["data"]["config"]["agent_id"] = fallback_agent_id
+                
+                # Re-execute with the fallback
+                try:
+                    result = await self._execute_node(fallback_node, nodes, edges)
+                    self.execution_history.append({
+                        "node_id": failed_node.get("id"),
+                        "type": "agent",
+                        "result": result,
+                        "status": "success",
+                        "is_fallback": True,
+                        "original_agent": failed_agent_id,
+                        "fallback_agent": fallback_agent_id
+                    })
+                    self.current_state["previous_output"] = result
+                    node_id = failed_node.get("id") or ""
+                    self.current_state[node_id] = result
+                    self.current_state["next_node_id"] = await self._get_next_node(failed_node, edges, result)
+                    return True
+                except Exception as e:
+                    workflow.logger.error(f"Fallback agent {fallback_agent_id} also failed: {e}")
+                    return False
+            else:
+                workflow.logger.warning("No fallback agent found.")
+                return False
+
     async def _trigger_compensation(self, nodes: List[Dict]) -> None:
         """
         Trigger SAGA compensation pattern - rollback executed nodes in reverse order
@@ -330,14 +401,11 @@ class OrchestrationWorkflow:
             if node:
                 try:
                     workflow.logger.info(f"⏪ Compensating node: {node_id}")
-                    
-                    # Execute compensation via activity
-                    # Note: You need to implement compensate_node activity
-                    # await workflow.execute_activity(
-                    #     compensate_node,
-                    #     args=[node, self.current_state],
-                    #     start_to_close_timeout=timedelta(seconds=60)
-                    # )
+                    await workflow.execute_activity(
+                        compensate_node,
+                        args=[node, self.current_state],
+                        start_to_close_timeout=timedelta(seconds=60)
+                    )
                     
                 except Exception as e:
                     workflow.logger.error(f"Compensation failed for {node_id}: {e}")
@@ -357,6 +425,8 @@ class OrchestrationWorkflow:
 
         if not outgoing_edges:
             return None
+        # This is a basic implementation. For production, a safer expression parser is recommended.
+        # Note: This uses eval and should be used with caution if conditions are user-provided.
 
         # Evaluate conditional edges
         for edge in outgoing_edges:
@@ -374,33 +444,15 @@ class OrchestrationWorkflow:
         return outgoing_edges[0].get("target") if outgoing_edges else None
 
     def _evaluate_condition(self, condition: str, data: Any) -> bool:
-        """
-        Safely evaluate edge condition
-        Supports: "output.confidence > 0.8", "output.status == 'approved'"
-        """
-        
-        try:
-            if not condition:
-                return True
-
-            # Create safe evaluation context
-            context = {
-                "output": data,
-                "state": self.current_state,
-                # Safe built-ins
-                "__builtins__": {
-                    "True": True,
-                    "False": False,
-                    "None": None,
-                }
-            }
-
-            # Use eval with restricted context
-            return bool(eval(condition, context, {}))
-
-        except Exception as e:
-            workflow.logger.error(f"Condition evaluation failed: {e}")
-            return False
+        """Safely evaluate edge condition"""
+        # WARNING: Use of eval is a potential security risk if conditions can be set by users.
+        # For a hackathon, this is likely acceptable. For production, use a safe expression parser.
+        context = {
+            "output": data,
+            "state": self.current_state,
+            "__builtins__": {"True": True, "False": False, "None": None, "len": len}
+        }
+        return bool(eval(condition, context, {}))
 
     def _find_node(self, nodes: List[Dict], node_id: str) -> Optional[Dict]:
         """Find node by ID"""
@@ -408,15 +460,10 @@ class OrchestrationWorkflow:
 
     def _find_start_node(self, nodes: List[Dict]) -> Optional[str]:
         """Find the trigger/start node"""
-        
         for node in nodes:
             if node.get("type") == "trigger":
                 return node.get("id")
-
-        # If no trigger found, return first node
         return nodes[0].get("id") if nodes else None
-
-    # ===== Signals for Workflow Control =====
 
     @workflow.signal
     async def approve(self, approval_data: Dict[str, Any]) -> None:
@@ -443,8 +490,6 @@ class OrchestrationWorkflow:
         """Resume workflow execution"""
         self.paused = False
         workflow.logger.info("▶️ Workflow resumed")
-
-    # ===== Queries for State Inspection =====
 
     @workflow.query
     def get_state(self) -> Dict[str, Any]:

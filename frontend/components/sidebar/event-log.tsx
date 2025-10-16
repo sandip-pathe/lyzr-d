@@ -14,21 +14,25 @@ import {
 import { cn } from "@/lib/utils";
 import { ExecutionEvent } from "@/types/workflow";
 
-const eventIcons = {
+const eventIcons: Record<string, typeof Activity> = {
   started: Zap,
   completed: CheckCircle2,
   failed: XCircle,
   approval_requested: AlertCircle,
 };
 
-const eventColors = {
+const eventColors: Record<string, string> = {
   started: "text-blue-600 bg-blue-50",
   completed: "text-green-600 bg-green-50",
   failed: "text-red-600 bg-red-50",
   approval_requested: "text-orange-600 bg-orange-50",
 };
 
-export function EventLogStream() {
+export function EventLogStream({
+  onViewReport,
+}: {
+  onViewReport: (event: ExecutionEvent) => void;
+}) {
   const { events, wsConnected } = useWorkflowStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -87,8 +91,9 @@ export function EventLogStream() {
             </div>
           ) : (
             events.map((event, index) => {
-              const Icon = eventIcons[event.eventType];
-              const colorClass = eventColors[event.eventType];
+              const Icon = eventIcons[event.eventType] || Activity;
+              const colorClass =
+                eventColors[event.eventType] || "text-gray-600 bg-gray-50";
 
               return (
                 <motion.div

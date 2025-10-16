@@ -16,7 +16,6 @@ export const ApprovalNode = memo((props: NodeProps) => {
       color="orange"
     >
       <div className="space-y-3">
-        {/* Approvers */}
         {approvers?.length > 0 && (
           <div className="space-y-1">
             <div className="text-xs font-medium text-gray-700">Approvers</div>
@@ -29,19 +28,17 @@ export const ApprovalNode = memo((props: NodeProps) => {
             </div>
           </div>
         )}
-
-        {/* Channels */}
-        <div className="flex items-center gap-2">
-          {channels?.includes("email") && (
-            <Mail className="w-4 h-4 text-gray-500" />
-          )}
-          {channels?.includes("slack") && (
-            <MessageSquare className="w-4 h-4 text-gray-500" />
-          )}
-          <span className="text-xs text-gray-500">
-            {channels?.join(", ") || "Email"}
-          </span>
-        </div>
+        {channels?.length > 0 && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs font-medium text-gray-700">Channels:</span>
+            {channels.includes("email") && (
+              <Mail className="w-4 h-4 text-gray-500" />
+            )}
+            {channels.includes("slack") && (
+              <MessageSquare className="w-4 h-4 text-gray-500" />
+            )}
+          </div>
+        )}
       </div>
     </BaseNode>
   );

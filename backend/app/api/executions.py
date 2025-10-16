@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-
 from temporalio.client import Client
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.workflow import Execution
 from app.temporal.workflows import OrchestrationWorkflow
+from app.services.narration import NarrationService
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -92,3 +92,16 @@ async def cancel_execution(execution_id: str, db: Session = Depends(get_db)):
     execution.status = "canceled"
     db.commit()
     return {"status": "cancel_requested"}
+
+
+@router.get("/{execution_id}/narrate")
+async def get_execution_narration(execution_id: str, db: Session = Depends(get_db)):
+    """Generate a human-readable narration of the execution."""
+    # You'll need to get the workflow_id from the execution
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    narration_service = NarrationService()
+    report = narration_service.generate_narration(execution.workflow_id, execution_id)
+    return {"narration": report}

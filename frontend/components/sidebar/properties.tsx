@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useWorkflowStore } from "@/lib/store";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,24 +16,29 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Settings, Trash2, Copy } from "lucide-react";
-import { useState } from "react";
+import { WorkflowNode } from "@/types/workflow";
 
 export function PropertiesPanel() {
-  const { nodes, selectedNodeId, updateNode, deleteNode } = useWorkflowStore();
+  const { nodes, selectedNodeId, updateNode, deleteNode, setSelectedNode } =
+    useWorkflowStore();
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
-  const [localConfig, setLocalConfig] = useState(
-    selectedNode?.data.config || {}
-  );
+  const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (selectedNode) {
+      setLocalConfig(selectedNode.data.config || {});
+    }
+  }, [selectedNode]);
 
   if (!selectedNode) {
     return (
-      <div className="h-full bg-white border-l border-gray-200 flex items-center justify-center">
-        <div className="text-center text-gray-400 p-8">
-          <Settings className="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <p className="text-sm font-medium">No node selected</p>
-          <p className="text-xs mt-2">Select a node to edit its properties</p>
-        </div>
+      <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 p-8 bg-black rounded-2xl">
+        <Settings className="w-16 h-16 mx-auto mb-4 opacity-50" />
+        <p className="text-sm font-medium">No node selected</p>
+        <p className="text-xs mt-2">
+          Select a node to view and edit its properties.
+        </p>
       </div>
     );
   }
@@ -54,11 +60,12 @@ export function PropertiesPanel() {
   const handleDelete = () => {
     if (confirm("Are you sure you want to delete this node?")) {
       deleteNode(selectedNode.id);
+      setSelectedNode(null);
     }
   };
 
-  const renderConfigFields = () => {
-    switch (selectedNode.type) {
+  const renderConfigFields = (node: WorkflowNode) => {
+    switch (node.type) {
       case "agent":
         return (
           <>
@@ -73,13 +80,9 @@ export function PropertiesPanel() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="lyzr">Lyzr Agent Factory</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="custom">Custom API</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Model</Label>
               <Input
@@ -88,7 +91,6 @@ export function PropertiesPanel() {
                 placeholder="gpt-4"
               />
             </div>
-
             <div className="space-y-2">
               <Label>Temperature</Label>
               <Input
@@ -102,7 +104,6 @@ export function PropertiesPanel() {
                 }
               />
             </div>
-
             <div className="space-y-2">
               <Label>Prompt</Label>
               <Textarea
@@ -112,20 +113,8 @@ export function PropertiesPanel() {
                 rows={4}
               />
             </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-tune">Auto-Tuning</Label>
-              <Switch
-                id="auto-tune"
-                checked={localConfig.autoTune || false}
-                onCheckedChange={(checked) =>
-                  handleConfigUpdate("autoTune", checked)
-                }
-              />
-            </div>
           </>
         );
-
       case "action":
         return (
           <>
@@ -147,7 +136,6 @@ export function PropertiesPanel() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>URL</Label>
               <Input
@@ -156,7 +144,6 @@ export function PropertiesPanel() {
                 placeholder="https://api.example.com/endpoint"
               />
             </div>
-
             <div className="space-y-2">
               <Label>Headers (JSON)</Label>
               <Textarea
@@ -167,20 +154,8 @@ export function PropertiesPanel() {
                 className="font-mono text-xs"
               />
             </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="compensation">Enable Compensation</Label>
-              <Switch
-                id="compensation"
-                checked={localConfig.compensation || false}
-                onCheckedChange={(checked) =>
-                  handleConfigUpdate("compensation", checked)
-                }
-              />
-            </div>
           </>
         );
-
       case "approval":
         return (
           <>
@@ -198,7 +173,6 @@ export function PropertiesPanel() {
                 rows={2}
               />
             </div>
-
             <div className="space-y-2">
               <Label>Approval Type</Label>
               <Select
@@ -211,11 +185,9 @@ export function PropertiesPanel() {
                 <SelectContent>
                   <SelectItem value="any">Any (first approval wins)</SelectItem>
                   <SelectItem value="all">All (unanimous)</SelectItem>
-                  <SelectItem value="majority">Majority</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Timeout (hours)</Label>
               <Input
@@ -228,7 +200,6 @@ export function PropertiesPanel() {
             </div>
           </>
         );
-
       case "eval":
         return (
           <>
@@ -258,39 +229,21 @@ export function PropertiesPanel() {
                 rows={4}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Pass Threshold</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                value={localConfig.threshold || 0.8}
-                onChange={(e) =>
-                  handleConfigUpdate("threshold", parseFloat(e.target.value))
-                }
-              />
-            </div>
           </>
         );
-
       case "timer":
         return (
-          <>
-            <div className="space-y-2">
-              <Label>Duration (seconds)</Label>
-              <Input
-                type="number"
-                value={localConfig.duration || 60}
-                onChange={(e) =>
-                  handleConfigUpdate("duration", parseInt(e.target.value))
-                }
-              />
-            </div>
-          </>
+          <div className="space-y-2">
+            <Label>Duration (seconds)</Label>
+            <Input
+              type="number"
+              value={localConfig.duration || 60}
+              onChange={(e) =>
+                handleConfigUpdate("duration", parseInt(e.target.value))
+              }
+            />
+          </div>
         );
-
       case "event":
         return (
           <>
@@ -308,7 +261,6 @@ export function PropertiesPanel() {
                 rows={3}
               />
             </div>
-
             <div className="space-y-2">
               <Label>Action</Label>
               <Select
@@ -326,7 +278,6 @@ export function PropertiesPanel() {
             </div>
           </>
         );
-
       default:
         return (
           <div className="text-sm text-gray-500">
@@ -337,17 +288,15 @@ export function PropertiesPanel() {
   };
 
   return (
-    <div className="h-full bg-white border-l border-gray-200 overflow-y-auto">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
-        <div className="flex items-center gap-2">
+    <div className="h-full bg-black rounded-2xl text-white overflow-y-auto">
+      <div className="p-4 border-b border-gray-600 bg-black">
+        <div className="flex items-center bg-inherit gap-2">
           <Settings className="w-5 h-5 text-purple-600" />
-          <h2 className="font-semibold text-lg text-gray-900">Properties</h2>
+          <h2 className="font-semibold text-lg text-white">Configurations</h2>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Node Info */}
         <div className="space-y-2">
           <Label>Node ID</Label>
           <Input
@@ -356,12 +305,10 @@ export function PropertiesPanel() {
             className="font-mono text-xs"
           />
         </div>
-
         <div className="space-y-2">
           <Label>Node Type</Label>
           <Input value={selectedNode.type.toUpperCase()} disabled />
         </div>
-
         <div className="space-y-2">
           <Label>Label</Label>
           <Input
@@ -373,17 +320,15 @@ export function PropertiesPanel() {
 
         <Separator />
 
-        {/* Dynamic Configuration */}
         <div className="space-y-4">
           <h3 className="font-semibold text-sm text-gray-700">Configuration</h3>
-          {renderConfigFields()}
+          {renderConfigFields(selectedNode)}
         </div>
 
         <Separator />
 
-        {/* Actions */}
         <div className="space-y-2">
-          <Button variant="outline" className="w-full" size="sm">
+          <Button variant="default" className="w-full bg-gray-500" size="sm">
             <Copy className="w-4 h-4 mr-2" />
             Duplicate Node
           </Button>

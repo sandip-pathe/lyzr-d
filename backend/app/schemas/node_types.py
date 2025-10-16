@@ -42,6 +42,7 @@ class ApprovalConfig(BaseModel):
     approvers: List[str]
     approval_type: str = Field("any", description="any|all|majority")
     channels: List[str] = ["slack", "email"]
+    email_provider: str = Field("resend", description="resend|mailchimp|sendgrid")
     timeout_hours: int = 24
     escalation_approvers: Optional[List[str]] = None
 

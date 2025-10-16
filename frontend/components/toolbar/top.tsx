@@ -1,31 +1,28 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useWorkflowStore } from "@/lib/store";
 import { Separator } from "@/components/ui/separator";
 import {
   Play,
-  Pause,
-  Square,
-  RotateCcw,
   Save,
   Download,
-  Upload,
-  Layout,
   Sidebar,
   Loader2,
+  Square,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import {
-  mockNodes,
-  mockEdges,
-  mockEventHubNodes,
-  mockEventHubEdges,
-  mockEvents,
-} from "@/lib/mock-data";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { mockNodes, mockEdges } from "@/lib/mock-data";
+import { RunWorkflowModal } from "./run-wf-modal";
 
 export function ExecutionToolbar() {
   const {
@@ -34,80 +31,49 @@ export function ExecutionToolbar() {
     workflowName,
     toggleLeftSidebar,
     toggleRightSidebar,
-    toggleBottomPanel,
     leftSidebarOpen,
     rightSidebarOpen,
-    bottomPanelOpen,
     setNodes,
     setEdges,
-    layoutType,
-    addEvent,
-    clearEvents,
-    resetWorkflow,
     nodes,
     edges,
     workflowId,
+    setExecutionId,
+    clearEvents,
   } = useWorkflowStore();
-
-  const [executionTime, setExecutionTime] = useState("00:00:00");
-  const [completedNodes, setCompletedNodes] = useState(0);
-  const [totalCost, setTotalCost] = useState(0);
-
-  const handlePause = () => {
-    setMode("paused");
-  };
-
-  const handleLoadTemplate = () => {
-    if (layoutType === "dag") {
-      setNodes(mockNodes);
-      setEdges(mockEdges);
-    } else {
-      setNodes(mockEventHubNodes);
-      setEdges(mockEventHubEdges);
-    }
-  };
-
+  const [isRunModalOpen, setIsRunModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // --- MUTATION FOR EXECUTING THE WORKFLOW ---
   const executeMutation = useMutation({
     mutationFn: (inputData: any) => {
-      if (!workflowId) {
-        throw new Error("No workflow ID is set.");
-      }
-      return fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}/execute`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input_data: inputData }),
-        }
-      ).then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to start workflow execution.");
-        }
-        return res.json();
-      });
+      if (!workflowId) throw new Error("No workflow ID.");
+      return fetch(`http://localhost:8000/workflows/${workflowId}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_data: inputData }),
+      }).then((res) =>
+        res.ok
+          ? res.json()
+          : Promise.reject(new Error("Failed to start execution."))
+      );
     },
     onSuccess: (data) => {
-      toast.success("Workflow execution started!", {
-        description: `Execution ID: ${data.execution_id}`,
+      toast.success("Execution started!", {
+        description: `ID: ${data.execution_id}`,
       });
+      setExecutionId(data.execution_id);
       setMode("executing");
       clearEvents();
+      setIsRunModalOpen(false);
     },
-    onError: (error) => toast.error(`Execution failed: ${error.message}`),
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  // --- MUTATION FOR SAVING THE WORKFLOW ---
   const saveMutation = useMutation({
     mutationFn: () => {
-      if (!workflowId) {
-        throw new Error("No workflow ID is set.");
-      }
+      if (!workflowId) throw new Error("No workflow ID.");
       const payload = {
         name: workflowName,
-        description: "Updated from the UI",
         nodes: nodes.map(({ id, type, position, data }) => ({
           id,
           type,
@@ -116,153 +82,131 @@ export function ExecutionToolbar() {
         })),
         edges: edges.map(({ id, source, target }) => ({ id, source, target })),
       };
-      return fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      ).then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to save the workflow.");
-        }
-        return res.json();
-      });
+      return fetch(`http://localhost:8000/workflows/${workflowId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error("Failed to save."))
+      );
     },
     onSuccess: () => {
-      toast.success("Workflow saved successfully!");
+      toast.success("Workflow saved!");
       queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] });
     },
-    onError: (error) => toast.error(`Save failed: ${error.message}`),
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const handleExecute = () => {
-    executeMutation.mutate({});
-  };
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  const handleStop = () => {
-    setMode("design");
-    clearEvents();
-  };
-
-  const handleReset = () => {
-    if (confirm("Reset workflow to default state?")) {
-      resetWorkflow();
-      setNodes(mockNodes);
-      setEdges(mockEdges);
-    }
-  };
-
   return (
-    <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
-      {/* Left Section - Workflow Info */}
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">
-            {workflowName}
-          </h1>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded-full font-medium",
-                mode === "design" && "bg-gray-100 text-gray-700",
-                mode === "executing" &&
-                  "bg-blue-100 text-blue-700 animate-pulse",
-                mode === "completed" && "bg-green-100 text-green-700",
-                mode === "failed" && "bg-red-100 text-red-700"
-              )}
-            >
-              {mode.toUpperCase()}
-            </span>
-            <span>{layoutType === "dag" ? "DAG Mode" : "Event Hub Mode"}</span>
+    <>
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-10 bg-black p-2 rounded-xl flex items-center gap-2 text-white">
+        <TooltipProvider>
+          <div className="px-3">
+            <h1 className="text-sm font-semibold">{workflowName}</h1>
           </div>
-        </div>
+          <Separator orientation="vertical" className="h-6" />
+          <Button
+            onClick={() => setIsRunModalOpen(true)}
+            disabled={mode === "executing" || executeMutation.isPending}
+            className="bg-gray-50 hover:bg-gray-100 text-green-900"
+          >
+            {executeMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+            <span className="ml-1">Run</span>
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                className="bg-gray-700 text-white hover:bg-gray-600"
+                size="icon"
+                onClick={() => setMode("design")}
+                disabled={mode === "design"}
+              >
+                <Square className="w-4 h-4" color="white" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Stop Execution</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-6" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Save</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Download className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (confirm("Reset canvas to default?")) {
+                    setNodes(mockNodes);
+                    setEdges(mockEdges);
+                  }
+                }}
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reset Canvas</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-6" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={leftSidebarOpen ? "secondary" : "ghost"}
+                size="icon"
+                onClick={toggleLeftSidebar}
+              >
+                <Sidebar className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Left Panel</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={rightSidebarOpen ? "secondary" : "ghost"}
+                size="icon"
+                onClick={toggleRightSidebar}
+              >
+                <Sidebar className="w-4 h-4 rotate-180" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Right Panel</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
-
-      {/* Center Section - Execution Controls */}
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={handleExecute}
-          disabled={mode === "executing" || executeMutation.isPending}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          {executeMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Play className="w-4 h-4 mr-2" />
-          )}
-          Run
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handlePause}
-          disabled={mode !== "executing"}
-        >
-          <Pause className="w-4 h-4 mr-2" />
-          Pause
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handleStop}
-          disabled={mode === "design"}
-        >
-          <Square className="w-4 h-4 mr-2" />
-          Stop
-        </Button>
-
-        <Button variant="outline" onClick={handleReset}>
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset
-        </Button>
-      </div>
-
-      {/* Right Section - Actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSave}
-          disabled={saveMutation.isPending || !workflowId}
-        >
-          {saveMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 mr-2" />
-          )}
-          Save
-        </Button>
-
-        <Button variant="outline" size="sm">
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </Button>
-
-        <Separator orientation="vertical" className="h-8" />
-
-        {/* View Controls */}
-        <Button
-          variant={leftSidebarOpen ? "default" : "outline"}
-          size="sm"
-          onClick={toggleLeftSidebar}
-        >
-          <Sidebar className="w-4 h-4" />
-        </Button>
-
-        <Button
-          variant={rightSidebarOpen ? "default" : "outline"}
-          size="sm"
-          onClick={toggleRightSidebar}
-        >
-          <Sidebar className="w-4 h-4 rotate-180" />
-        </Button>
-      </div>
-    </div>
+      <RunWorkflowModal
+        open={isRunModalOpen}
+        onClose={() => setIsRunModalOpen(false)}
+        onRun={(data) => executeMutation.mutate(data)}
+        isExecuting={executeMutation.isPending}
+      />
+    </>
   );
 }

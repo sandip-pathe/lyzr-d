@@ -76,7 +76,6 @@ export const useWorkflowStore = create<WorkflowState>()(
     rightSidebarOpen: true,
     bottomPanelOpen: false,
     wsConnected: false,
-
     currentApproval: null,
     // ... (previous actions)
     setCurrentApproval: (approval) => set({ currentApproval: approval }),

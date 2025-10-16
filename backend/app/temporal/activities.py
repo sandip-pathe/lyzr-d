@@ -7,26 +7,32 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from app.services.agent_executor import AgentExecutor
 from app.services.eval_service import EvalService
+from app.services.compensation_service import CompensationService
+from app.services.self_healing import SelfHealingService
 from app.core.database import SessionLocal
 from app.models.workflow import ApprovalRequest
 from app.core.events import event_bus
 
 eval_service = EvalService()
+compensation_service = CompensationService()
+self_healing_service = SelfHealingService()
 
 @activity.defn
 async def execute_agent_node(node: dict, state: dict) -> dict:
     """Execute agent node"""
     executor = AgentExecutor()
     node_data = node.get("data", {})
-    input_data = executor.resolve_input(node_data.get("input_mapping", {}), state)
+    
+    # Resolve input from the current state
+    input_mapping = node_data.get("config", {}).get("input_mapping", {})
+    input_data = executor.resolve_input(input_mapping, state)
     
     result = await executor.execute(
-        provider=node_data.get("provider", "openai"),
-        agent_id=node_data.get("agent_id"),
+        provider=node_data.get("config", {}).get("provider", "openai"),
+        agent_id=node_data.get("config", {}).get("agent_id"),
         input_data=input_data,
     )
     
-    # ✅ FIX: Added await
     await event_bus.publish("node.completed", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -36,6 +42,24 @@ async def execute_agent_node(node: dict, state: dict) -> dict:
     })
     
     return result
+
+@activity.defn
+async def get_fallback_agent(provider: str, failed_agent_id: str, all_agent_ids: List[str]) -> Optional[str]:
+    """Activity to get a fallback agent using the self-healing service."""
+    activity.logger.info(f"Getting fallback for failed agent {failed_agent_id}")
+    return self_healing_service.get_alternate_agent(provider, failed_agent_id, all_agent_ids)
+
+
+@activity.defn
+async def compensate_node(node: dict, state: dict):
+    """Activity to trigger compensation for a single node."""
+    activity.logger.info(f"Compensating node {node.get('id')}")
+    await compensation_service.compensate_node(
+        node=node,
+        execution_id=state.get("execution_id", ""),
+        workflow_id=state.get("workflow_id", ""),
+        state=state
+    )
 
 @activity.defn
 async def execute_http_request(node: dict, state: dict) -> dict:
@@ -56,7 +80,6 @@ async def execute_http_request(node: dict, state: dict) -> dict:
             "headers": dict(response.headers)
         }
     
-    # ✅ FIX: Added await
     await event_bus.publish("node.completed", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -97,7 +120,6 @@ async def send_approval_request(node: dict, state: dict) -> dict:
         channels=node_data.get("channels", ["slack"])
     )
     
-    # ✅ FIX: Added await
     await event_bus.publish("approval.requested", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -116,7 +138,6 @@ async def execute_eval_node(node: dict, state: dict) -> dict:
     
     result = await eval_service.evaluate(eval_type, previous_output, node_data)
     
-    # ✅ FIX: Added await
     await event_bus.publish("eval.completed", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -137,7 +158,6 @@ async def execute_fork_node(node: dict, state: dict) -> dict:
     node_data = node.get("data", {})
     branches = node_data.get("branches", [])
     
-    # ✅ FIX: Added await
     await event_bus.publish("fork.started", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -166,7 +186,6 @@ async def execute_merge_node(node: dict, state: dict) -> dict:
     else:
         merged = {"results": branch_results}
     
-    # ✅ FIX: Added await
     await event_bus.publish("merge.completed", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -182,7 +201,6 @@ async def execute_timer_node(node: dict, state: dict) -> dict:
     node_data = node.get("data", {})
     duration_seconds = node_data.get("duration_seconds", 0)
     
-    # ✅ FIX: Added await
     await event_bus.publish("timer.started", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -192,7 +210,6 @@ async def execute_timer_node(node: dict, state: dict) -> dict:
     
     await asyncio.sleep(duration_seconds)
     
-    # ✅ FIX: Added await
     await event_bus.publish("timer.completed", {
         "workflow_id": state.get("workflow_id"),
         "execution_id": state.get("execution_id"),
@@ -209,7 +226,6 @@ async def execute_event_node(node: dict, state: dict) -> dict:
     channel = node_data.get("channel")
     
     if operation == "publish":
-        # ✅ FIX: Added await
         await event_bus.publish(channel, {
             "workflow_id": state.get("workflow_id"),
             "execution_id": state.get("execution_id"),
@@ -219,6 +235,7 @@ async def execute_event_node(node: dict, state: dict) -> dict:
         return {"operation": "published", "channel": channel}
     
     elif operation == "subscribe":
+        # In a real scenario, this would likely involve a long-running activity or a signal
         return {"operation": "subscribed", "channel": channel}
     
     return {}
@@ -238,7 +255,6 @@ async def execute_meta_node(node: dict, state: dict) -> dict:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        # ✅ FIX: Added await
         await event_bus.publish("meta.observation", {
             "workflow_id": state.get("workflow_id"),
             "execution_id": state.get("execution_id"),

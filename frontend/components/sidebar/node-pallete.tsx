@@ -37,10 +37,15 @@ export function NodePalette() {
   };
 
   return (
-    <div className="h-full bg-white border-r border-gray-200 overflow-y-auto">
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
-        <h2 className="font-semibold text-lg text-gray-900">Components</h2>
-        <p className="text-xs text-gray-600 mt-1">Drag and drop to canvas</p>
+    <div
+      className="h-full bg-black border-r border-gray-200 rounded-2xl overflow-y-auto"
+      style={{
+        scrollbarWidth: "none",
+      }}
+    >
+      <div className="p-4 border-b border-gray-200 bg-black">
+        <h2 className="font-semibold text-lg text-white">Components</h2>
+        <p className="text-xs text-gray-400 mt-1">Drag and drop to canvas</p>
       </div>
 
       <div className="p-3 space-y-2">
@@ -56,7 +61,7 @@ export function NodePalette() {
               draggable
               onDragStart={(e) => onDragStart(e as any, template.type)} // Cast the event
               className={cn(
-                "p-3 rounded-lg border-2 border-gray-200 bg-white",
+                "p-3 rounded-lg border-gray-200 bg-white",
                 "cursor-grab active:cursor-grabbing",
                 "hover:border-gray-300 hover:shadow-md",
                 "transition-all duration-200",
