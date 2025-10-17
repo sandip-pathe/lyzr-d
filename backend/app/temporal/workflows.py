@@ -187,7 +187,6 @@ class OrchestrationWorkflow:
                 retry_policy=RetryPolicy(maximum_attempts=3)
             )
         elif node_type == "approval":
-            #this import is intentional and is a simple fix.
             from app.temporal.activities import request_ui_approval
             await workflow.execute_activity(
                 request_ui_approval,
