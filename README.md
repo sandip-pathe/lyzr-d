@@ -59,7 +59,7 @@ graph TD
     
     subgraph "API Layer"
         F[FastAPI Server] --> G[Workflow Controller]
-        G --> H[/execute]
+        G --> H["/execute"]
     end
     
     subgraph "Execution Engine"
@@ -85,6 +85,7 @@ graph TD
     K --> P
     M --> R
 ```
+
 
 ### 🔄 Data Flow
 
