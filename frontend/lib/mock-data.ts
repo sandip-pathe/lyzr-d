@@ -9,9 +9,9 @@ import {
   Eye,
   Merge,
   Split,
-  UserRoundCheck,
   GitBranchPlus,
   Zap,
+  CheckCircle2,
 } from "lucide-react";
 
 export const mockNodes: WorkflowNode[] = [
@@ -130,11 +130,11 @@ export const mockNodes: WorkflowNode[] = [
   },
   {
     id: "action-1",
-    type: "action",
+    type: "api_call",
     position: { x: 250, y: 960 },
     data: {
       label: "Send Notification",
-      type: "action",
+      type: "api_call",
       status: "idle",
       config: {
         method: "POST",
@@ -181,8 +181,8 @@ export const nodeTemplates = [
     icon: Bot,
   },
   {
-    type: "action",
-    label: "Action",
+    type: "api_call",
+    label: "API Call",
     description: "HTTP/API call",
     color: "bg-purple-500",
     icon: Globe,
@@ -193,13 +193,6 @@ export const nodeTemplates = [
     description: "Simple in-app confirmation",
     color: "bg-orange-500",
     icon: CheckCheck,
-  },
-  {
-    type: "hitl",
-    label: "Human-in-the-Loop",
-    description: "Send for external approval (Slack/Email)",
-    color: "bg-orange-500",
-    icon: UserRoundCheck,
   },
   {
     type: "conditional",
@@ -242,5 +235,12 @@ export const nodeTemplates = [
     description: "Policy check",
     color: "bg-yellow-500",
     icon: Target,
+  },
+  {
+    type: "end",
+    label: "End",
+    description: "End of workflow",
+    color: "bg-gray-800",
+    icon: CheckCircle2,
   },
 ] as const;

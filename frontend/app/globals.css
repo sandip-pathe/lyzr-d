@@ -38,15 +38,32 @@
 }
 
 /* Custom styles for React Flow components */
-.react-flow__controls {
-  @apply bg-black fixed bottom-4 left-1/2 transform -translate-x-1/2 rounded-lg border-none p-1;
-}
+
 .react-flow__controls button {
-  @apply bg-transparent hover:bg-gray-900 transition-colors w-8 h-8;
+  @apply bg-transparent p-2 hover:bg-gray-900 transition-colors w-8 h-8 border-0 outline-none;
 }
+
 .react-flow__controls-button svg {
     @apply w-4 h-4 text-white;
 }
+.react-flow__attribution {
+  display: none !important;
+}
+
 .react-flow__minimap {
-  @apply !bg-white/80 !backdrop-blur-sm !rounded-lg !shadow-xl !border-none;
+  @apply bg-gray-900 bg-opacity-80 backdrop-blur-md rounded-md shadow-2xl;
+  border: none;
+}
+
+/* Style the mask that shows the current viewport */
+.react-flow__minimap-mask {
+  @apply bg-white bg-opacity-10;
+  border: none;
+  border-radius: 4px;
+  fill-opacity: 0.05;
+}
+
+/* You can even add a transition for a smoother feel */
+.react-flow__minimap-node {
+    transition: all 0.1s ease-in-out;
 }

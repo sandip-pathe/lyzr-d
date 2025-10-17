@@ -30,10 +30,8 @@ export function ExecutionToolbar() {
     setMode,
     workflowName,
     toggleLeftSidebar,
-    toggleRightSidebar,
     leftSidebarOpen,
     addEvent,
-    rightSidebarOpen,
     setNodes,
     setEdges,
     nodes,
@@ -201,18 +199,6 @@ export function ExecutionToolbar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Toggle Left Panel</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={rightSidebarOpen ? "secondary" : "ghost"}
-                size="icon"
-                onClick={toggleRightSidebar}
-              >
-                <Sidebar className="w-4 h-4 rotate-180" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Toggle Right Panel</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>

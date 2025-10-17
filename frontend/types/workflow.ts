@@ -5,16 +5,17 @@ import { Node, Edge } from "@xyflow/react";
 export type NodeType =
   | "trigger"
   | "agent"
-  | "action"
+  | "api_call"
   | "approval"
-  | "hitl"
   | "conditional"
-  | "eval"
+  | "hitl"
+  | "timer"
   | "fork"
   | "merge"
-  | "timer"
   | "event"
-  | "meta";
+  | "eval"
+  | "meta"
+  | "end";
 
 export type NodeStatus =
   | "idle"

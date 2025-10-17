@@ -6,53 +6,45 @@ from pydantic import BaseModel, Field
 class NodeType(str, Enum):
     TRIGGER = "trigger"
     AGENT = "agent"
-    ACTION = "action"
+    API_CALL = "api_call"
     APPROVAL = "approval"
     CONDITIONAL = "conditional"
-    HITL = "hitl"
-    EVAL = "eval"
     FORK = "fork"
     MERGE = "merge"
-    TIMER = "timer"
     EVENT = "event"
+    EVAL = "eval"
     META = "meta"
+    END = "end"
 
 class TriggerConfig(BaseModel):
-    trigger_type: str = Field("on_run", description="on_run|after_hours|select_date")
-    hours: Optional[int] = Field(None, description="Number of hours to wait before triggering")
+    type: str = Field("manual", description="manual | date")
     date: Optional[str] = Field(None, description="Date to trigger the workflow")
 
 class AgentConfig(BaseModel):
-    provider: str = Field(..., description="openai|lyzr|custom")
-    agent_id: str
-    input_mapping: Dict[str, Any] = {}
-    timeout: int = 300
-    retry_max_attempts: int = 3
-    temperature: Optional[float] = None
-    enable_auto_tuning: bool = False
+    userInput: str = Field("", description="User input text")
+    attachments: List[str] = Field([], description="List of attachment URLs")
+    systemPrompt: str = Field("", description="System prompt for the agent")
 
-class ActionConfig(BaseModel):
-    action_type: str = Field(..., description="http|email|db")
-    method: Optional[str] = "POST"
-    url: Optional[str] = None
-    headers: Dict[str, str] = {}
-    body: Dict[str, Any] = {}
-    timeout: int = 30
-    idempotency_key: Optional[str] = None
+class API_CallConfig(BaseModel):
+    url: str = Field("", description="URL for the API call")
+    method: str = Field("GET", description="HTTP method")
+    headers: Dict[str, str] = Field({}, description="Headers for the API call")
+    body: Dict[str, Any] = Field({}, description="Body for the API call")
+
+class ConditionalConfig(BaseModel):
+    condition: str = Field("", description="The condition to evaluate")
 
 class ApprovalConfig(BaseModel):
     prompt: str = Field("Do you approve this step?", description="The question to display in the UI pop-up.")
 
-class HITLConfig(BaseModel):
-    approvers: List[str]
-    approval_type: str = Field("any", description="any|all|majority")
-    channels: List[str] = ["slack", "email"]
-    email_provider: str = Field("resend", description="resend|mailchimp|sendgrid")
-    timeout_hours: int = 24
-    escalation_approvers: Optional[List[str]] = None
+class ForkConfig(BaseModel):
+    pass
 
-class ConditionalConfig(BaseModel):
-    conditions: List[Dict[str, str]] = Field(..., description="List of conditions and target node IDs")
+class MergeConfig(BaseModel):
+    pass
+
+class EventConfig(BaseModel):
+    topic: str = Field("", description="The event topic to publish to")
 
 class EvalConfig(BaseModel):
     eval_type: str = Field(..., description="schema|llm_judge|policy|custom")
@@ -63,43 +55,27 @@ class EvalConfig(BaseModel):
     on_failure: str = Field("block", description="block|warn|retry|compensate")
     criteria: Optional[str] = None
 
-class ForkConfig(BaseModel):
-    branches: List[List[str]] = Field(..., description="List of node ID lists for each branch")
-    wait_for: str = Field("all", description="all|any|first")
-
-class MergeConfig(BaseModel):
-    merge_strategy: str = Field("combine", description="combine|first|vote")
-    required_branches: Optional[int] = None
-
-class TimerConfig(BaseModel):
-    duration_seconds: int
-    timer_type: str = Field("delay", description="delay|timeout|schedule")
-
-class EventConfig(BaseModel):
-    operation: str = Field(..., description="publish|subscribe")
-    channel: str
-    wait_for_response: bool = False
-    timeout_seconds: Optional[int] = 30
-
 class MetaConfig(BaseModel):
     operation: str = Field(..., description="observe|enforce|intervene")
     metrics: List[str] = ["latency", "cost", "success_rate"]
     policy_checks: Optional[List[str]] = None
 
+class EndConfig(BaseModel):
+    pass
+
 # Master node type registry
 NODE_TYPE_SCHEMAS = {
     NodeType.TRIGGER: TriggerConfig,
     NodeType.AGENT: AgentConfig,
-    NodeType.ACTION: ActionConfig,
+    NodeType.API_CALL: API_CallConfig,
     NodeType.APPROVAL: ApprovalConfig,
     NodeType.CONDITIONAL: ConditionalConfig,
-    NodeType.HITL: HITLConfig,
-    NodeType.EVAL: EvalConfig,
     NodeType.FORK: ForkConfig,
     NodeType.MERGE: MergeConfig,
-    NodeType.TIMER: TimerConfig,
     NodeType.EVENT: EventConfig,
+    NodeType.EVAL: EvalConfig,
     NodeType.META: MetaConfig,
+    NodeType.END: EndConfig,
 }
 
 def get_node_type_info(node_type: str) -> Dict[str, Any]:
@@ -112,7 +88,7 @@ def get_node_type_info(node_type: str) -> Dict[str, Any]:
     schema_class = NODE_TYPE_SCHEMAS[node_type_enum]
     return {
         "type": node_type,
-        "name": node_type.capitalize(),
+        "name": node_type.capitalize().replace("_", " "),
         "schema": schema_class.model_json_schema(),
         "description": schema_class.__doc__ or f"{node_type} node"
     }

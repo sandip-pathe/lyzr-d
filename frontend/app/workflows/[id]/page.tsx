@@ -6,9 +6,8 @@ import { useWorkflow } from "@/hooks/useWorkflow";
 import { motion, AnimatePresence } from "framer-motion";
 import { ApprovalModal } from "@/components/modals/approval";
 import { EventLogStream } from "@/components/sidebar/event-log";
-import { NodePalette } from "@/components/sidebar/node-pallete";
 import { PropertiesPanel } from "@/components/sidebar/properties";
-import { WorkflowCanvas } from "@/components/ui/canvas/canvas";
+import { WorkflowCanvas } from "@/components/canvas/canvas";
 import { useWorkflowStore } from "@/lib/store";
 import { ExecutionToolbar } from "@/components/toolbar/top";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -16,6 +15,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { NarrationModal } from "@/components/modals/narration";
 import { OutputPanel } from "@/components/sidebar/output";
+import { NodePalette } from "@/components/sidebar/node-pallete";
 
 export default function WorkflowEditorPage({
   params,
@@ -25,7 +25,6 @@ export default function WorkflowEditorPage({
   const {
     mode,
     leftSidebarOpen,
-    rightSidebarOpen,
     selectedNodeId,
     setWorkflowId,
     executionId,
@@ -112,7 +111,7 @@ export default function WorkflowEditorPage({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-0 left-0 bottom-0 w-72 bg-black flex flex-col"
+            className="fixed top-0 left-0 bottom-0 w-64 bg-black flex flex-col"
           >
             {mode === "completed" || mode === "failed" ? (
               <OutputPanel />
@@ -131,7 +130,7 @@ export default function WorkflowEditorPage({
       </AnimatePresence>
 
       <AnimatePresence>
-        {rightSidebarOpen && selectedNodeId && (
+        {selectedNodeId && (
           <motion.div
             initial={{ x: "100%", opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}

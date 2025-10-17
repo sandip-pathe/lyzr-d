@@ -5,8 +5,6 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError, ActivityError
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
-import asyncio
-from backend.app.temporal.activities import request_ui_approval
 
 
 with workflow.unsafe.imports_passed_through():
@@ -48,8 +46,6 @@ class OrchestrationWorkflow:
     @workflow.run
     async def run(self, workflow_id: str, workflow_def: Dict[str, Any], input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Main workflow execution entry point"""
-        
-        # Initialize state
         self.current_state = {
             "input": input_data,
             "workflow_id": workflow_id,
@@ -64,7 +60,7 @@ class OrchestrationWorkflow:
 
         try:
             current_node_id = self._find_start_node(nodes)
-            
+
             while current_node_id:
                 # Check if paused - wait for resume signal
                 await workflow.wait_condition(lambda: not self.paused)
@@ -74,6 +70,10 @@ class OrchestrationWorkflow:
                     break
 
                 node_type = node.get("type", "unknown")
+                if node_type == "end":
+                    workflow.logger.info(f"Workflow ended at node: {current_node_id}")
+                    break
+
                 workflow.logger.info(f"⚡ Executing node: {current_node_id} (type: {node_type})")
 
                 try:
@@ -97,13 +97,13 @@ class OrchestrationWorkflow:
 
                 except ActivityError as e:
                     workflow.logger.error(f"❌ Node {current_node_id} failed with ActivityError: {str(e)}")
-                    
+
                     if node_type == 'agent':
                         is_rerouted = await self._handle_agent_failure(node, nodes, edges)
                         if is_rerouted:
                             current_node_id = self.current_state.get("next_node_id")
-                            continue 
-                    
+                            continue
+
                     self.execution_history.append({
                         "node_id": current_node_id,
                         "type": node_type,
@@ -157,7 +157,7 @@ class OrchestrationWorkflow:
 
     async def _execute_node(self, node: Dict[str, Any], nodes: List[Dict], edges: List[Dict]) -> Any:
         """Execute a single node based on its type"""
-        
+
         node_type = node.get("type", "unknown")
         node_id = node.get("id", "")
 
@@ -171,7 +171,7 @@ class OrchestrationWorkflow:
                 execute_agent_node,
                 args=[node, execution_context],
                 start_to_close_timeout=timedelta(seconds=300),
-                retry_policy=RetryPolicy(  # ✅ Using correct import
+                retry_policy=RetryPolicy(
                     maximum_attempts=3,
                     initial_interval=timedelta(seconds=1),
                     maximum_interval=timedelta(seconds=10),
@@ -179,15 +179,16 @@ class OrchestrationWorkflow:
                 )
             )
 
-        elif node_type == "action":
+        elif node_type == "api_call":
             return await workflow.execute_activity(
                 execute_http_request,
                 args=[node, execution_context],
                 start_to_close_timeout=timedelta(seconds=60),
-                retry_policy=RetryPolicy(maximum_attempts=3) 
+                retry_policy=RetryPolicy(maximum_attempts=3)
             )
-
         elif node_type == "approval":
+            #this import is intentional and is a simple fix.
+            from app.temporal.activities import request_ui_approval
             await workflow.execute_activity(
                 request_ui_approval,
                 args=[node, execution_context],
@@ -195,31 +196,8 @@ class OrchestrationWorkflow:
             )
 
             await workflow.wait_condition(lambda: self.approval_received)
-            
+
             self.approval_received = False # Reset for next approval
-            if self.approval_data and self.approval_data.get("action") == "reject":
-                raise ApplicationError("Approval rejected by user in UI.", non_retryable=True)
-            
-            return self.approval_data
-
-        elif node_type == "hitl":
-            # This is the old "approval" logic
-            await workflow.execute_activity(
-                send_approval_request,
-                args=[node, execution_context],
-                start_to_close_timeout=timedelta(seconds=30)
-            )
-
-            timeout_hours = node.get("data", {}).get("timeout_hours", 24)
-            try:
-                await workflow.wait_condition(
-                    lambda: self.approval_received,
-                    timeout=timedelta(hours=timeout_hours)
-                )
-            except asyncio.TimeoutError:
-                raise ApplicationError(f"HITL approval timeout after {timeout_hours} hours", non_retryable=True)
-
-            self.approval_received = False
             return self.approval_data
 
         elif node_type == "conditional":
@@ -238,67 +216,26 @@ class OrchestrationWorkflow:
             # Handle evaluation failure
             if not result.get("passed", False):
                 on_failure = node.get("data", {}).get("on_failure", "block")
-                
+
                 if on_failure == "compensate":
                     await self._trigger_compensation(nodes)
-                    raise ApplicationError("Eval failed, compensation triggered")  # ✅ Correct
+                    raise ApplicationError("Eval failed, compensation triggered")
                 elif on_failure == "retry":
-                    raise ApplicationError("Eval failed, triggering retry")  # ✅ Correct
+                    raise ApplicationError("Eval failed, triggering retry")
                 elif on_failure == "block":
-                    raise ApplicationError(f"Eval failed: {result.get('reason', 'Unknown')}")  # ✅ Correct
-            
+                    raise ApplicationError(f"Eval failed: {result.get('reason', 'Unknown')}")
+
             return result
 
         elif node_type == "fork":
-            # Execute parallel branches
-            fork_result = await workflow.execute_activity(
-                execute_fork_node,
-                args=[node, execution_context],
-                start_to_close_timeout=timedelta(seconds=10)
-            )
+            return {"status": "forked"}
 
-            branches = fork_result.get("branches", [])
-            
-            # Create tasks for each branch
-            branch_tasks = []
-            for branch_nodes in branches:
-                task = asyncio.create_task(
-                    self._execute_branch(branch_nodes, nodes, edges)
-                )
-                branch_tasks.append(task)
-
-            # Wait strategy
-            wait_for = node.get("data", {}).get("wait_for", "all")
-            
-            if wait_for == "all":
-                branch_results = await asyncio.gather(*branch_tasks)
-            elif wait_for == "any":
-                done, pending = await asyncio.wait(
-                    branch_tasks, 
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-                branch_results = [t.result() for t in done]
-                for task in pending:
-                    task.cancel()
-            else:
-                branch_results = await asyncio.gather(*branch_tasks, return_exceptions=True)
-
-            # Store for merge node
-            self.current_state["branch_results"] = branch_results
-            return {"branches_completed": len(branch_results), "results": branch_results}
 
         elif node_type == "merge":
             return await workflow.execute_activity(
                 execute_merge_node,
                 args=[node, execution_context],
                 start_to_close_timeout=timedelta(seconds=30)
-            )
-
-        elif node_type == "timer":
-            return await workflow.execute_activity(
-                execute_timer_node,
-                args=[node, execution_context],
-                start_to_close_timeout=timedelta(hours=24)
             )
 
         elif node_type == "event":
@@ -369,7 +306,7 @@ class OrchestrationWorkflow:
                 # Create a new, temporary node definition for the fallback agent
                 fallback_node = failed_node.copy()
                 fallback_node["data"]["config"]["agent_id"] = fallback_agent_id
-                
+
                 # Re-execute with the fallback
                 try:
                     result = await self._execute_node(fallback_node, nodes, edges)
@@ -398,12 +335,12 @@ class OrchestrationWorkflow:
         """
         Trigger SAGA compensation pattern - rollback executed nodes in reverse order
         """
-        
+
         workflow.logger.info("🔄 Triggering compensation (rollback)")
 
         # Get successfully executed nodes in reverse order
         successful_nodes = [
-            h for h in self.execution_history 
+            h for h in self.execution_history
             if h.get("status") == "success"
         ]
         successful_nodes.reverse()
@@ -411,7 +348,7 @@ class OrchestrationWorkflow:
         for history_entry in successful_nodes:
             node_id = history_entry.get("node_id", "")
             node = self._find_node(nodes, node_id)
-            
+
             if node:
                 try:
                     workflow.logger.info(f"⏪ Compensating node: {node_id}")
@@ -420,60 +357,55 @@ class OrchestrationWorkflow:
                         args=[node, self.current_state],
                         start_to_close_timeout=timedelta(seconds=60)
                     )
-                    
+
                 except Exception as e:
                     workflow.logger.error(f"Compensation failed for {node_id}: {e}")
 
     async def _get_next_node(
-        self, 
-        current_node: Dict[str, Any], 
-        edges: List[Dict], 
+        self,
+        current_node: Dict[str, Any],
+        edges: List[Dict],
         result: Any
     ) -> Optional[str]:
         """Determine next node based on edges and conditions"""
-        
+
         current_id = current_node.get("id", "")
         node_type = current_node.get("type")
 
-
         if node_type == "conditional":
-            conditions = current_node.get("data", {}).get("config", {}).get("conditions", [])
-            for condition_item in conditions:
-                condition = condition_item.get("condition")
-                target_id = condition_item.get("target_id")
-                if condition and target_id and self._evaluate_condition(condition, result):
-                    return target_id
-            # Fallback to the 'else' or default edge if no condition matches
-            default_edge = next((e for e in edges if e.get("source") == current_id and not e.get("condition")), None)
-            return default_edge.get("target") if default_edge else None
-        
-                # Find outgoing edges
+            condition_str = current_node.get("data", {}).get("config", {}).get("condition", "False")
+            condition_eval = self._evaluate_condition(condition_str, result)
+            handle_id = 'true' if condition_eval else 'false'
+            edge = next((e for e in edges if e.get("source") == current_id and e.get("sourceHandle") == handle_id), None)
+            return edge.get("target") if edge else None
+
+        if node_type == "approval":
+            action = result.get("action", "reject")
+            handle_id = 'approve' if action == "approve" else 'reject'
+            edge = next((e for e in edges if e.get("source") == current_id and e.get("sourceHandle") == handle_id), None)
+            return edge.get("target") if edge else None
+
+        if node_type == "fork":
+            outgoing_edges = [e.get("target") for e in edges if e.get("source") == current_id]
+            return outgoing_edges[0] if outgoing_edges else None
+
         outgoing_edges = [e for e in edges if e.get("source") == current_id]
 
         if not outgoing_edges:
             return None
-
-        # Evaluate conditional edges
-        for edge in outgoing_edges:
-            condition = edge.get("condition")
-            if not condition:
-                continue
-            if self._evaluate_condition(condition, result):
-                return edge.get("target")
-            
-        unconditional_edge = next((e for e in outgoing_edges if not e.get("condition")), None)
-        return unconditional_edge.get("target") if unconditional_edge else None
+        return outgoing_edges[0].get("target")
 
     def _evaluate_condition(self, condition: str, data: Any) -> bool:
         """Safely evaluate edge condition"""
-        # WARNING: Use of eval is a potential security risk if conditions can be set by users.
-        # For a hackathon, this is likely acceptable. For production, use a safe expression parser.
-        context = {
-            "output": data,
-            "state": self.current_state,
-            "__builtins__": {"True": True, "False": False, "None": None, "len": len}
-        }
-        return bool(eval(condition, context, {}))
+        try:
+            context = {
+                "output": data,
+                "state": self.current_state,
+                "__builtins__": {"True": True, "False": False, "None": None, "len": len}
+            }
+            return bool(eval(condition, context, {}))
+        except:
+            return False
 
     def _find_node(self, nodes: List[Dict], node_id: str) -> Optional[Dict]:
         """Find node by ID"""

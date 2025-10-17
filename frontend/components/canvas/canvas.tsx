@@ -28,7 +28,7 @@ import { EventHubNode } from "./nodes/event-hub-node";
 const nodeTypes: NodeTypes = {
   trigger: CustomNode,
   agent: CustomNode,
-  action: CustomNode,
+  api_call: CustomNode,
   approval: CustomNode,
   hitl: CustomNode,
   conditional: CustomNode,
@@ -38,6 +38,7 @@ const nodeTypes: NodeTypes = {
   timer: CustomNode,
   event: EventHubNode,
   meta: CustomNode,
+  end: CustomNode,
 };
 
 const snapGrid: [number, number] = [15, 15];
@@ -156,18 +157,30 @@ function WorkflowCanvasInner() {
           style: { strokeWidth: 2 },
         }}
         fitView
+        fitViewOptions={{ padding: 0.15 }}
         minZoom={0.2}
         maxZoom={4}
         className="bg-gray-50"
       >
         <Background color="#94a3b8" gap={15} />
-        <Controls />
+        <Controls
+          className="bg-black rounded-md shadow-md p-2"
+          orientation="horizontal"
+          position="bottom-center"
+        />
+
         <MiniMap
+          className="bg-black backdrop-blur-sm rounded-lg shadow-xl border-0"
+          nodeStrokeColor={() => "#ffffff"}
+          nodeBorderRadius={8}
+          nodeStrokeWidth={2}
+          pannable
+          zoomable
           nodeColor={(node) => {
             const colors = {
               trigger: "#22c55e",
               agent: "#a855f7",
-              action: "#3b82f6",
+              api_call: "#3b82f6",
               approval: "#f97316",
               hitl: "#f97316",
               conditional: "#4f46e5",
@@ -177,6 +190,7 @@ function WorkflowCanvasInner() {
               timer: "#06b6d4",
               event: "#ef4444",
               meta: "#6b7280",
+              end: "#1f2937",
             };
             return colors[node.type as NodeType] || "#6b7280";
           }}

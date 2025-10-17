@@ -7,7 +7,7 @@ import {
   Bot,
   Globe,
   Target,
-  CheckCheck,
+  CheckCircle2,
   Clock,
   Radio,
   Eye,
@@ -23,8 +23,8 @@ import { cn } from "@/lib/utils";
 const iconComponents = {
   trigger: Zap,
   agent: Bot,
-  action: Globe,
-  approval: CheckCheck,
+  api_call: Globe,
+  approval: CheckCircle2,
   hitl: UserRoundCheck,
   conditional: GitBranchPlus,
   eval: Target,
@@ -33,6 +33,7 @@ const iconComponents = {
   timer: Clock,
   event: Radio,
   meta: Eye,
+  end: CheckCircle2,
 };
 
 export function NodePalette() {

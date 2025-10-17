@@ -63,32 +63,19 @@ export function PropertiesPanel() {
             <div className="space-y-2">
               <Label>Trigger Type</Label>
               <Select
-                value={localConfig.trigger_type || "on_run"}
-                onValueChange={(v) => handleConfigUpdate("trigger_type", v)}
+                value={localConfig.type || "manual"}
+                onValueChange={(v) => handleConfigUpdate("type", v)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="on_run">On Run</SelectItem>
-                  <SelectItem value="after_hours">After Hours</SelectItem>
-                  <SelectItem value="select_date">Select Date</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {localConfig.trigger_type === "after_hours" && (
-              <div className="space-y-2">
-                <Label>Hours</Label>
-                <Input
-                  type="number"
-                  value={localConfig.hours || 1}
-                  onChange={(e) =>
-                    handleConfigUpdate("hours", parseInt(e.target.value))
-                  }
-                />
-              </div>
-            )}
-            {localConfig.trigger_type === "select_date" && (
+            {localConfig.type === "date" && (
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Input
@@ -106,58 +93,54 @@ export function PropertiesPanel() {
         return (
           <>
             <div className="space-y-2">
-              <Label>Provider</Label>
-              <Select
-                value={localConfig.provider || "openai"}
-                onValueChange={(v) => handleConfigUpdate("provider", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Model</Label>
-              <Input
-                value={localConfig.model || "gpt-4"}
-                onChange={(e) => handleConfigUpdate("model", e.target.value)}
-                placeholder="gpt-4"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Temperature</Label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                max="2"
-                value={localConfig.temperature || 0.7}
-                onChange={(e) =>
-                  handleConfigUpdate("temperature", parseFloat(e.target.value))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Prompt</Label>
+              <Label>User Input</Label>
               <Textarea
-                value={localConfig.prompt || ""}
-                onChange={(e) => handleConfigUpdate("prompt", e.target.value)}
+                value={localConfig.userInput || ""}
+                onChange={(e) =>
+                  handleConfigUpdate("userInput", e.target.value)
+                }
+                placeholder="Enter user input..."
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Attachments</Label>
+              <Input
+                value={localConfig.attachments || ""}
+                onChange={(e) =>
+                  handleConfigUpdate("attachments", e.target.value.split(","))
+                }
+                placeholder="URL1, URL2,..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>System Prompt</Label>
+              <Textarea
+                value={localConfig.systemPrompt || ""}
+                onChange={(e) =>
+                  handleConfigUpdate("systemPrompt", e.target.value)
+                }
                 placeholder="Enter system prompt..."
                 rows={4}
               />
             </div>
           </>
         );
-      case "action":
+      case "api_call":
         return (
           <>
             <div className="space-y-2">
+              <Label>URL</Label>
+              <Input
+                value={localConfig.url || ""}
+                onChange={(e) => handleConfigUpdate("url", e.target.value)}
+                placeholder="https://api.example.com/endpoint"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>HTTP Method</Label>
               <Select
-                value={localConfig.method || "POST"}
+                value={localConfig.method || "GET"}
                 onValueChange={(v) => handleConfigUpdate("method", v)}
               >
                 <SelectTrigger>
@@ -173,19 +156,33 @@ export function PropertiesPanel() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>URL</Label>
-              <Input
-                value={localConfig.url || ""}
-                onChange={(e) => handleConfigUpdate("url", e.target.value)}
-                placeholder="https://api.example.com/endpoint"
+              <Label>Headers (JSON)</Label>
+              <Textarea
+                value={
+                  localConfig.headers
+                    ? JSON.stringify(localConfig.headers, null, 2)
+                    : "{}"
+                }
+                onChange={(e) =>
+                  handleConfigUpdate("headers", JSON.parse(e.target.value))
+                }
+                placeholder='{"Authorization": "Bearer token"}'
+                rows={3}
+                className="font-mono text-xs"
               />
             </div>
             <div className="space-y-2">
-              <Label>Headers (JSON)</Label>
+              <Label>Body (JSON)</Label>
               <Textarea
-                value={localConfig.headers || "{}"}
-                onChange={(e) => handleConfigUpdate("headers", e.target.value)}
-                placeholder='{"Authorization": "Bearer token"}'
+                value={
+                  localConfig.body
+                    ? JSON.stringify(localConfig.body, null, 2)
+                    : "{}"
+                }
+                onChange={(e) =>
+                  handleConfigUpdate("body", JSON.parse(e.target.value))
+                }
+                placeholder='{"key": "value"}'
                 rows={3}
                 className="font-mono text-xs"
               />
@@ -205,146 +202,37 @@ export function PropertiesPanel() {
             />
           </div>
         );
-
-      // NEW: HITL Configuration (old approval logic)
-      case "hitl":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Approvers (comma-separated emails)</Label>
-              <Textarea
-                value={localConfig.approvers?.join(", ") || ""}
-                onChange={(e) =>
-                  handleConfigUpdate(
-                    "approvers",
-                    e.target.value.split(",").map((s) => s.trim())
-                  )
-                }
-                placeholder="john@company.com, jane@company.com"
-                rows={2}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Approval Type</Label>
-              <Select
-                value={localConfig.approvalType || "any"}
-                onValueChange={(v) => handleConfigUpdate("approvalType", v)}
-              >
-                {/* ... Select options */}
-              </Select>
-            </div>
-            {/* ... other HITL config fields */}
-          </>
-        );
-
-      // NEW: Conditional Node Configuration
       case "conditional":
         return (
           <div className="space-y-2">
-            <Label>Conditions</Label>
+            <Label>Condition</Label>
             <Textarea
-              value={
-                localConfig.conditions
-                  ? JSON.stringify(localConfig.conditions, null, 2)
-                  : '[\n  {\n    "condition": "output.status == \\"success\\"",\n    "target_id": "node-id-if-true"\n  }\n]'
-              }
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  handleConfigUpdate("conditions", parsed);
-                } catch (err) {
-                  // Handle invalid JSON
-                }
-              }}
-              placeholder="Define conditions and target node IDs"
-              rows={6}
+              value={localConfig.condition || ""}
+              onChange={(e) => handleConfigUpdate("condition", e.target.value)}
+              placeholder='output.status == "success"'
+              rows={3}
               className="font-mono text-xs"
-            />
-            <p className="text-xs text-gray-500">
-              Define a list of conditions. The first one that evaluates to true
-              will be followed. Use &aspo;output to reference the previous nodes
-              result.
-            </p>
-          </div>
-        );
-      case "eval":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Evaluation Type</Label>
-              <Select
-                value={localConfig.evalType || "llm_judge"}
-                onValueChange={(v) => handleConfigUpdate("evalType", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="schema">Schema Validation</SelectItem>
-                  <SelectItem value="llm_judge">LLM Judge</SelectItem>
-                  <SelectItem value="policy">Policy Check</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Criteria</Label>
-              <Textarea
-                value={localConfig.criteria || ""}
-                onChange={(e) => handleConfigUpdate("criteria", e.target.value)}
-                placeholder="Define evaluation criteria..."
-                rows={4}
-              />
-            </div>
-          </>
-        );
-      case "timer":
-        return (
-          <div className="space-y-2">
-            <Label>Duration (seconds)</Label>
-            <Input
-              type="number"
-              value={localConfig.duration || 60}
-              onChange={(e) =>
-                handleConfigUpdate("duration", parseInt(e.target.value))
-              }
             />
           </div>
         );
       case "event":
         return (
-          <>
-            <div className="space-y-2">
-              <Label>Topics (comma-separated)</Label>
-              <Textarea
-                value={localConfig.topics?.join(", ") || ""}
-                onChange={(e) =>
-                  handleConfigUpdate(
-                    "topics",
-                    e.target.value.split(",").map((s) => s.trim())
-                  )
-                }
-                placeholder="workflow.started, node.completed"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Action</Label>
-              <Select
-                value={localConfig.action || "publish"}
-                onValueChange={(v) => handleConfigUpdate("action", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="publish">Publish</SelectItem>
-                  <SelectItem value="subscribe">Subscribe</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </>
+          <div className="space-y-2">
+            <Label>Topic</Label>
+            <Input
+              value={localConfig.topic || ""}
+              onChange={(e) => handleConfigUpdate("topic", e.target.value)}
+              placeholder="e.g., workflow.completed"
+            />
+          </div>
+        );
+      case "fork":
+      case "merge":
+      case "end":
+        return (
+          <div className="text-sm text-gray-500">
+            No configuration options for this node type.
+          </div>
         );
       default:
         return (
@@ -364,7 +252,7 @@ export function PropertiesPanel() {
         <div className="flex items-center bg-inherit gap-2">
           <Settings className="w-5 h-5 text-purple-600" />
           <h2 className="font-semibold text-lg text-white">
-            {selectedNode.type.toUpperCase()}
+            {selectedNode.type.toUpperCase().replace("_", " ")}
           </h2>
         </div>
       </div>
