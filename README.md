@@ -1,237 +1,247 @@
-# Agentic Orchestration Builder: A Framework for Hybrid Deterministic and Non-Deterministic Workflow Execution
+<div align="center">
 
-**Agentic Syndicate**  
-*AI Infrastructure Research Division*
+# 🎯 Agentic Orchestration Builder
 
----
+### Visual, Event-Driven AI Workflow Orchestration Platform
 
-## Abstract
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-lyzr.anaya.legal-00d4ff?style=for-the-badge)](https://lyzr-alpha.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/sandip-pathe/lyzr)
 
-Modern AI systems are transitioning from linear, deterministic workflows to adaptive, agentic processes characterized by non-deterministic decision-making. Current orchestration tools (e.g., Airflow, n8n) lack the necessary architectural primitives to handle this paradigm shift. We present **Agentic Orchestration Builder**, a novel framework that bridges deterministic workflow engines with non-deterministic agentic systems through temporal durability, event-driven execution, and human-in-the-loop checkpoints. Our system enables seamless collaboration between structured business logic and intelligent agentic components while maintaining full auditability and state persistence.
+**Built in 6 days** | Complex AI workflows that feel like magic ✨
 
-![System Architecture](https://blog.aspiresys.com/wp-content/uploads/2025/01/Infographics_Benefits-of-Agentic-AI-for-Businesses-1-1024x626.jpg)
+[Features](#-key-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [Tech Stack](#-tech-stack) • [Demo](#-live-demo)
+
+</div>
 
 
-![Pub Sub](https://a.storyblok.com/f/231922/1726x800/3100b5f90a/pub-sub-model.png/m/0x0/)
 
-## 1. Introduction
+## 🎬 Live Demo
 
-### 1.1 Problem Statement
+**🌐 Try it now:** [lyzr-alpha.vercel.app](https://lyzr-alpha.vercel.app/)
 
-The evolution of artificial intelligence from tool-based to agentic systems has exposed significant limitations in existing workflow orchestration platforms. Traditional systems operate under assumptions of determinism and predictable execution paths, making them fundamentally incompatible with the emergent behaviors and decision-making processes characteristic of modern AI agents.
+> Experience the full power of hybrid AI-agentic orchestration with our live deployment. Build, execute, and monitor complex workflows in real-time.
 
-### 1.2 Research Contribution
 
-This work introduces a hybrid orchestration architecture that combines:
-- **Deterministic workflow foundations** through Temporal-based state management
-- **Non-deterministic agentic integration** via pluggable AI agent frameworks
-- **Event-driven control planes** using Redis Pub/Sub for loose coupling
-- **Human oversight mechanisms** through multi-channel approval systems
 
-## 2. System Architecture
+## 💡 The Problem & Our Solution
 
-### 2.1 Core Components
+### ⚠️ The Challenge
+Existing workflow tools (Airflow, n8n, Zapier) are built for **predictable, deterministic tasks**. They fail when dealing with the **non-deterministic, adaptive nature** of modern AI agents.
 
-Our architecture employs a layered approach that separates concerns while maintaining interoperability between deterministic and non-deterministic execution paths.
+### ✨ Our Approach
+A **hybrid orchestrator** combining:
+- ✅ **Reliability** of deterministic workflow engines (Temporal)
+- ⚡ **Flexibility** of event-driven architecture (Redis Pub/Sub)
+- 🎯 **Single, auditable workflow** for both traditional logic and intelligent AI agents
 
-| Layer | Technology Stack | Primary Function |
-|-------|------------------|------------------|
-| Presentation Layer | React + React Flow + shadcn/ui | Visual workflow composition and real-time monitoring |
-| API Gateway | FastAPI + WebSocket | Unified orchestration interface and live updates |
-| Workflow Engine | Temporal | Durable execution, state persistence, and replay capability |
-| Event System | Redis Pub/Sub | Decoupled event-driven communication |
-| Data Persistence | PostgreSQL | Workflow definitions and metadata storage |
-| Agent Framework | Lyzr/OpenAI/Custom | Intelligent decision-making nodes |
-| HITL Interface | Slack/Email/Web | Human approval checkpoint integration |
+### 🏆 The Result
+A full-stack platform that orchestrates **both deterministic and non-deterministic AI workflows** with:
+- 🎨 Visual canvas for workflow design
+- 🤖 Multi-model AI agent support
+- 👤 Human-in-the-loop approval steps
+- 📊 Real-time state management
+- 🔍 Complete observability
 
-### 2.2 Architectural Overview
+
+
+## 🏗️ Architecture
+
+### System Overview
 
 ```mermaid
 graph TD
     subgraph Frontend
-        A[React Flow Canvas] --> B{Run Workflow};
-        B --> C[RunWorkflowModal];
-        C --> D{Execute};
-        D --> E[useMutation];
+        A[React Flow Canvas] --> B{Run Workflow}
+        B --> C[RunWorkflowModal]
+        C --> D{Execute}
+        D --> E[useMutation]
     end
-
+    
     subgraph "API Layer"
-        F[FastAPI Server] --> G[Workflow Controller];
-        G --> H{/execute};
+        F[FastAPI Server] --> G[Workflow Controller]
+        G --> H[/execute]
     end
-
+    
     subgraph "Execution Engine"
-        I[Temporal Worker] --> J[OrchestrationWorkflow];
-        J --> K[Activity Execution];
+        I[Temporal Worker] --> J[OrchestrationWorkflow]
+        J --> K[Activity Execution]
     end
-
+    
     subgraph Infrastructure
-        L[Redis Pub/Sub] --> M[Event Dispatcher];
-        N[PostgreSQL] --> O[State Store];
-        P[Agent APIs] --> Q[Decision Engine];
+        L[Redis Pub/Sub] --> M[Event Dispatcher]
+        N[PostgreSQL] --> O[State Store]
+        P[Agent APIs] --> Q[Decision Engine]
     end
-
+    
     subgraph "Real-time Updates"
-        R[WebSocket Client] --> S[useWorkflowWebSocket];
-        S --> T[EventLogStream];
-        S --> U[OutputSidebar];
+        R[WebSocket Client] --> S[useWorkflowWebSocket]
+        S --> T[EventLogStream]
+        S --> U[OutputSidebar]
     end
-
-    E --> H;
-    H --> J;
-    J --> L;
-    K --> P;
-    M --> R;
+    
+    E --> H
+    H --> J
+    J --> L
+    K --> P
+    M --> R
 ```
 
-*Figure 1: System component interaction diagram illustrating the flow of control and data between architectural layers.*
+### 🔄 Data Flow
 
-## 3. Technical Implementation
-
-### 3.1 Event-Driven Orchestration Model
-
-Our system treats all workflow operations as discrete events, enabling fine-grained control and monitoring. The event taxonomy includes:
-
-- **`workflow_initialized`**: Triggered upon workflow instantiation
-- **`node_activated`**: Signals node execution commencement
-- **`agent_decision_requested`**: Invokes non-deterministic agent processing
-- **`approval_required`**: Pauses execution pending human input
-- **`execution_completed`**: Marks node or workflow termination
-
-### 3.2 Temporal-Powered Durability
-
-The integration with Temporal provides several critical capabilities:
-
-```python
-# Pseudocode: Workflow definition with agentic components
-@workflow.defn
-class AgenticWorkflow:
-    @workflow.run
-    async def run(self, input: WorkflowInput) -> WorkflowOutput:
-        # Deterministic preprocessing
-        processed_data = await workflow.execute_activity(
-            preprocess_activity,
-            input.raw_data
-        )
-        
-        # Non-deterministic agentic decision
-        agent_decision = await workflow.execute_activity(
-            agent_inference_activity,
-            processed_data,
-            start_to_close_timeout=timedelta(minutes=5)
-        )
-        
-        # Human-in-the-loop checkpoint
-        if agent_decision.requires_approval:
-            approval_result = await workflow.execute_activity(
-                request_approval_activity,
-                agent_decision,
-                task_queue="approvals"
-            )
-            
-        # Conditional execution paths
-        if approval_result.approved:
-            return await workflow.execute_activity(
-                execute_action_activity,
-                approval_result
-            )
+```
+User Design → FastAPI → Temporal → AI Agent → Redis Event → WebSocket → Real-time UI Update
 ```
 
-*Figure 2: Example workflow implementation demonstrating hybrid deterministic/non-deterministic execution with HITL integration.*
+1. **Design:** Visual workflow creation on React Flow canvas
+2. **Execute:** Workflow sent to FastAPI backend with input data
+3. **Orchestrate:** Temporal creates durable execution instance
+4. **Process:** Worker executes AI Agent nodes (GPT-4o, Lyzr, custom agents)
+5. **Event:** Task completion published to Redis Pub/Sub
+6. **Monitor:** Frontend receives WebSocket events, updates canvas in real-time
+7. **HITL:** Workflow pauses for human approval when needed
+8. **Resume:** Approved workflows continue to completion
 
-### 3.3 Human-in-the-Loop System
 
-The human oversight mechanism implements a multi-channel approval system:
 
-![HITL Flow](https://hai.stanford.edu/assets/images/1_0sh42fnwf6xln-mbnqqtvw.jpg)
+## ✨ Key Features
 
-1. **Approval Triggering**: Workflow execution pauses at designated approval nodes
-2. **Multi-channel Notification**: Simultaneous alerts via Slack, email, and in-app notifications
-3. **Decision Capture**: Approval/rejection with optional reasoning and modifications
-4. **State Resumption**: Temporal seamlessly resumes execution from pause point
 
-## 4. Experimental Evaluation
+### 🎨 Visual Builder
+Drag-and-drop canvas powered by **React Flow** for intuitive workflow design
 
-### 4.1 Development Timeline
+### 🔀 Hybrid Orchestration
+Seamlessly blend deterministic nodes (HTTP, timers) with non-deterministic AI agents
 
-| Phase | Duration | Key Achievements |
-|-------|----------|------------------|
-| Foundation | Days 1-2 | Temporal + FastAPI integration, PostgreSQL schema design |
-| Agent Integration | Day 3 | Lyzr/OpenAI connector, custom agent framework |
-| Frontend Development | Day 4 | React Flow canvas, real-time WebSocket updates |
-| System Integration | Day 5 | End-to-end testing, performance optimization |
-| Documentation | Day 6 | Academic paper, API documentation, deployment guides |
+### 👥 Human-in-the-Loop
+Pause workflows for critical approvals via Slack, email, or web interface
 
-### 4.2 Performance Characteristics
+</td>
+<td width="50%">
 
-Our preliminary evaluation demonstrates the following system characteristics:
+### 📊 Real-time Monitoring
+Live event streaming via WebSockets with complete execution visibility
 
-- **State Persistence**: Full workflow state capture with sub-second persistence latency
-- **Event Processing**: 10,000+ events per second through Redis Pub/Sub
-- **Agent Response**: Sub-2 second agent decision latency for typical workloads
-- **Approval Resolution**: Median 5-minute human response time across channels
+### 📈 Agent Metrics
+Track performance, latency, reliability, and cost per execution
 
-## 5. Comparative Analysis
+### 💾 Durable Execution
+Temporal-powered stateful workflows with full auditability and replay capability
 
-### 5.1 Differentiation from Existing Solutions
+</td>
+</tr>
+</table>
 
-While contemporary "AI orchestration" platforms typically wrap REST endpoints with basic scheduling, our approach provides fundamental orchestration primitives:
 
-| Feature | Traditional Orchestrators | Agentic Orchestration Builder |
-|---------|---------------------------|-------------------------------|
-| State Management | Ephemeral or database-backed | Temporal-powered durability with replay |
-| Non-determinism Support | Limited or non-existent | First-class agentic node integration |
-| Human Integration | Manual intervention required | Structured HITL checkpoints |
-| Event Handling | Polling-based | Real-time event-driven architecture |
-| Execution Guarantees | At-least-once delivery | Exactly-once semantics with rollback |
 
-## 6. Conclusion and Future Work
+## 🛠️ Tech Stack
 
-We have presented Agentic Orchestration Builder, a novel framework that successfully bridges the gap between deterministic workflow engines and non-deterministic agentic systems. Our architecture provides the necessary primitives for building production-grade AI systems that combine the reliability of traditional orchestration with the adaptability of modern AI agents.
+### Frontend
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![React Flow](https://img.shields.io/badge/React_Flow-FF0072?style=for-the-badge&logo=react&logoColor=white)
 
-### 6.1 Future Research Directions
+### Backend
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Temporal](https://img.shields.io/badge/Temporal-000000?style=for-the-badge&logo=temporal&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 
-- **Distributed Agent Networks**: Scaling to multi-agent collaborative environments
-- **Advanced Monitoring**: Real-time explainability and decision provenance tracking
-- **Federated Learning Integration**: Continuous agent improvement while maintaining data privacy
-- **Quantum-Resistant Security**: Preparing for post-quantum cryptographic requirements
+### AI & Infrastructure
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![WebSocket](https://img.shields.io/badge/WebSocket-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 
-## 7. Access and Implementation
+**Optimized for:** Reliability • Composability • Low Latency
 
-### 7.1 System Requirements
 
-- Python 3.9+ with FastAPI and Temporal SDK
-- Node.js 16+ with React and React Flow
-- Redis 6.0+ for event broadcasting
-- PostgreSQL 12+ for persistent storage
-- Temporal service for workflow orchestration
+## 🚀 Vision Beyond the Hackathon
 
-### 7.2 Quick Start Deployment
+This prototype is the foundation for a **no-code orchestration layer for enterprise AI workflows**.
+
+### Roadmap
+- 🏢 **Multi-tenant Architecture:** Isolation and security for enterprise deployments
+- 📚 **Version Control:** Git-like workflow versioning and rollback
+- 🎨 **Template Library:** Pre-built agent workflows for common business processes
+- 🔌 **Plugin Ecosystem:** Community-contributed nodes and integrations
+- 🌐 **Global Deployment:** Edge execution for latency-sensitive workflows
+
+**Think:** Zapier meets LangChain, with enterprise-grade auditability and durability.
+
+
+
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+
+- Python 3.11+
+
+### Installation
 
 ```bash
-# Backend initialization
-cd backend
-pip install -r requirements.txt
-temporal server start-dev
-uvicorn app.main:app --reload --port 8000
+# Clone the repository
+git clone https://github.com/sandip-pathe/lyzr.git
+cd lyzr
 
-# Frontend initialization  
-cd frontend
-npm install
-npm run dev
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your database, Redis, Temporal, and AI model credentials
+
+# Launch the platform
+docker-compose up --build
 ```
 
-Access the visual orchestration interface at `http://localhost:3000` and API documentation at `http://localhost:8000/docs`.
+### Access Points
 
-## References
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Frontend** | `http://localhost:3000` | Visual workflow builder & dashboard |
+| **Backend API** | `http://localhost:8000/docs` | Interactive API documentation |
+| **Temporal UI** | `http://localhost:8088` | Workflow execution monitoring |
 
-1. Temporal Technologies. (2023). "Durable Execution Systems." Temporal Documentation.
-2. OpenAI. (2024). "Agentic Patterns and Best Practices." OpenAI Developer Guides.
-3. Lyzr AI. (2024). "Enterprise Agent Framework." Lyzr Documentation.
-4. Redis Labs. (2023). "Pub/Sub Pattern for Event-Driven Architectures." Redis Documentation.
+
+
+## 🎯 Why It's Different
+
+> Every AI orchestration platform focuses on the **agents themselves**. We focus on the **coordination logic** — the missing layer between intelligence and execution.
+
+### Our Unique Approach
+- 🎯 **Agents as Components:** Treat AI agents as powerful but unpredictable units within a reliable framework
+- 🔧 **Reliability First:** Deterministic orchestration for non-deterministic AI
+- 📊 **Full Observability:** No black boxes — see every step, every decision
+- 🏢 **Enterprise-Ready:** Auditability, durability, and compliance built-in
+
+
+## 👨‍💻 Team & Credits
+
+**Solo Build** by [Sandip Pathe](https://github.com/sandip-pathe)
+
+Built in **6 days** with:
+- ☕ Lots of coffee
+- 🎵 Late-night coding sessions
+- 💪 Passion for robust AI systems
+
+
+
+## 📝 License
+
+>© 2025 Sandip Pathe – All rights reserved. For evaluation and demonstration only.
 
 ---
 
-**License**: MIT © 2025 Agentic Syndicate  
-**Correspondence**: LYZR-hackathon-PS1 
-**Repository**: github.com/sandip-pathe/lyzr
+<div align="center">
+
+### ⭐ Star this repo if you find it useful!
+
+**Built with ❤️ for the future of AI orchestration**
+
+[![GitHub Stars](https://img.shields.io/github/stars/sandip-pathe/lyzr?style=social)](https://github.com/sandip-pathe/lyzr)
+[![GitHub Forks](https://img.shields.io/github/forks/sandip-pathe/lyzr?style=social)](https://github.com/sandip-pathe/lyzr/fork)
+
+[🚀 Live Demo](https://lyzr-alpha.vercel.app/) • [📖 Documentation](#) • [🐛 Report Bug](#) • [💡 Request Feature](#)
+
+</div>
