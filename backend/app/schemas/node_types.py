@@ -12,66 +12,85 @@ class NodeType(str, Enum):
     FORK = "fork"
     MERGE = "merge"
     EVENT = "event"
+    TIMER = "timer"
     EVAL = "eval"
     META = "meta"
     END = "end"
 
-class TriggerConfig(BaseModel):
-    type: str = Field("manual", description="manual | date")
-    date: Optional[str] = Field(None, description="Date to trigger the workflow")
+class BaseNodeConfig(BaseModel):
+    """Base configuration shared by most nodes."""
+    # Optional: Define how inputs are mapped from the workflow state
+    input_mapping: Optional[Dict[str, Any]] = Field(None, description="Mapping of workflow state to node input")
+    # Optional: Define how the node's output should update the workflow state
+    output_mapping: Optional[Dict[str, str]] = Field(None, description="Mapping of node output to workflow state keys")
 
-class AgentConfig(BaseModel):
-    userInput: str = Field("", description="User input text")
-    attachments: List[str] = Field([], description="List of attachment URLs")
-    systemPrompt: str = Field("", description="System prompt for the agent")
+# --- Specific Node Configs Inheriting from Base ---
 
-class API_CallConfig(BaseModel):
-    url: str = Field("", description="URL for the API call")
-    method: str = Field("GET", description="HTTP method")
-    headers: Dict[str, str] = Field({}, description="Headers for the API call")
-    body: Dict[str, Any] = Field({}, description="Body for the API call")
+class TriggerConfig(BaseModel): # Trigger doesn't usually need input/output mapping
+    type: str = Field("manual", description="Type of trigger (e.g., manual, schedule, webhook)")
+    schedule: Optional[str] = Field(None, description="Cron string for scheduled triggers")
+    webhook_url: Optional[str] = Field(None, description="URL for webhook triggers")
 
-class ConditionalConfig(BaseModel):
-    condition: str = Field("", description="The condition to evaluate")
+class AgentConfig(BaseNodeConfig):
+    provider: str = Field(..., description="AI provider (e.g., openai, lyzr)")
+    agent_id: str = Field(..., description="Specific agent/model ID (e.g., gpt-4o-mini)")
+    # Input mapping is crucial here, inheriting from BaseNodeConfig
+    # Example specific agent config if needed:
+    temperature: Optional[float] = Field(None, description="Model temperature override")
 
-class ApprovalConfig(BaseModel):
-    prompt: str = Field("Do you approve this step?", description="The question to display in the UI pop-up.")
+class ApiCallConfig(BaseNodeConfig):
+    url: str = Field(..., description="URL for the API call")
+    method: str = Field("POST", description="HTTP method (GET, POST, PUT, DELETE, etc.)")
+    headers: Optional[Dict[str, str]] = Field({}, description="Headers for the API call")
+    body_template: Optional[Dict[str, Any]] = Field({}, description="JSON template for the request body, uses input_mapping")
 
-class ForkConfig(BaseModel):
-    pass
+class ApprovalConfig(BaseNodeConfig):
+    title: str = Field("Approval Required", description="Title of the approval request")
+    description: str = Field(..., description="Detailed description or instructions for the approver")
+    approvers: List[str] = Field(..., description="List of approver emails or IDs")
+    channels: List[str] = Field(["slack", "email"], description="Notification channels (slack, email)")
+    # Implicit output: {"action": "approve"|"reject", "comment": "...", "approver": "..."}
 
-class MergeConfig(BaseModel):
-    pass
+class ConditionalConfig(BaseNodeConfig):
+    condition_expression: str = Field(..., description="Python expression to evaluate against previous_output (e.g., 'output.status == \"success\"')")
 
-class EventConfig(BaseModel):
-    topic: str = Field("", description="The event topic to publish to")
+class EvalConfig(BaseNodeConfig):
+    eval_type: str = Field(..., description="Type of evaluation (e.g., schema, llm_judge, policy)")
+    config: Dict[str, Any] = Field(..., description="Specific configuration for the chosen eval_type")
+    on_failure: str = Field("block", description="Action on failure (block, warn, retry, compensate)")
 
-class EvalConfig(BaseModel):
-    eval_type: str = Field(..., description="schema|llm_judge|policy|custom")
-    schema_def: Optional[Dict[str, Any]] = None
-    confidence_threshold: Optional[float] = 0.8
-    policy_rules: Optional[List[Dict[str, Any]]] = None
-    llm_judge_prompt: Optional[str] = None
-    on_failure: str = Field("block", description="block|warn|retry|compensate")
-    criteria: Optional[str] = None
+class ForkConfig(BaseModel): 
+    branch_count: Optional[int] = Field(None, description="Expected number of branches (for validation)")
 
-class MetaConfig(BaseModel):
-    operation: str = Field(..., description="observe|enforce|intervene")
-    metrics: List[str] = ["latency", "cost", "success_rate"]
-    policy_checks: Optional[List[str]] = None
+class MergeConfig(BaseNodeConfig):
+    merge_strategy: str = Field("combine", description="How to merge branch results (combine, first, vote)")
+    # Input implicitly comes from completed branches
+
+class TimerConfig(BaseModel): # Timer usually just pauses
+    duration_seconds: int = Field(..., description="Wait duration in seconds")
+
+class EventConfig(BaseNodeConfig):
+    operation: str = Field("publish", description="publish or subscribe")
+    channel: str = Field(..., description="Event channel/topic name")
+    # Payload comes from input_mapping for publish
+
+class MetaConfig(BaseNodeConfig):
+    operation: str = Field("observe", description="observe, enforce, etc.")
+    metrics_to_capture: List[str] = Field(["latency", "status"], description="Metrics to log")
 
 class EndConfig(BaseModel):
     pass
 
-# Master node type registry
+# --- Update the Master Registry ---
 NODE_TYPE_SCHEMAS = {
     NodeType.TRIGGER: TriggerConfig,
     NodeType.AGENT: AgentConfig,
-    NodeType.API_CALL: API_CallConfig,
+    NodeType.API_CALL: ApiCallConfig, # Renamed class
     NodeType.APPROVAL: ApprovalConfig,
     NodeType.CONDITIONAL: ConditionalConfig,
     NodeType.FORK: ForkConfig,
     NodeType.MERGE: MergeConfig,
+    NodeType.TIMER: TimerConfig, # Added
     NodeType.EVENT: EventConfig,
     NodeType.EVAL: EvalConfig,
     NodeType.META: MetaConfig,

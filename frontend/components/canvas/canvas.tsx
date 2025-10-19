@@ -17,13 +17,28 @@ import {
   Panel,
   ReactFlowProvider,
 } from "@xyflow/react";
-import { WorkflowNode, NodeType, WorkflowEdge } from "@/types/workflow";
 import "@xyflow/react/dist/style.css";
 import { Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CustomNode } from "./nodes/custom";
 import { useWorkflowStore } from "@/lib/store";
 import { EventHubNode } from "./nodes/event-hub-node";
+
+import {
+  WorkflowNode,
+  NodeType,
+  WorkflowEdge,
+  TriggerConfig,
+  AgentConfig,
+  ApiCallConfig,
+  ApprovalConfig,
+  ConditionalConfig,
+  EvalConfig,
+  TimerConfig,
+  EventConfig,
+  MetaConfig,
+  SpecificNodeConfig,
+} from "@/types/workflow";
 
 const nodeTypes: NodeTypes = {
   trigger: CustomNode,
@@ -43,6 +58,52 @@ const nodeTypes: NodeTypes = {
 
 const snapGrid: [number, number] = [15, 15];
 
+const getDefaultConfig = (type: NodeType): SpecificNodeConfig | {} => {
+  switch (type) {
+    case "trigger":
+      return { type: "manual" } as TriggerConfig;
+    case "agent":
+      return { provider: "openai", agent_id: "" } as AgentConfig; // Provide defaults
+    case "api_call":
+      return {
+        url: "",
+        method: "POST",
+        headers: {},
+        body_template: {},
+      } as ApiCallConfig;
+    case "approval":
+      return {
+        title: "Approval Required",
+        description: "",
+        approvers: [],
+        channels: ["email"],
+      } as ApprovalConfig;
+    case "conditional":
+      return { condition_expression: "" } as ConditionalConfig;
+    case "eval":
+      // Needs a default eval_type and nested config
+      return {
+        eval_type: "schema",
+        config: {},
+        on_failure: "block",
+      } as EvalConfig;
+    case "timer":
+      return { duration_seconds: 30 } as TimerConfig;
+    case "event":
+      return { operation: "publish", channel: "" } as EventConfig;
+    case "meta":
+      return {
+        operation: "observe",
+        metrics_to_capture: ["status"],
+      } as MetaConfig;
+    case "fork":
+    case "merge":
+    case "end":
+    default:
+      return {}; // These might not need specific config initially
+  }
+};
+
 function WorkflowCanvasInner() {
   const {
     nodes: storeNodes,
@@ -60,7 +121,6 @@ function WorkflowCanvasInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const connectingNodeId = useRef<string | null>(null);
 
   useEffect(() => {
     setNodes(storeNodes);
@@ -113,20 +173,23 @@ function WorkflowCanvasInner() {
         x: event.clientX,
         y: event.clientY,
       });
+      const defaultConfig = getDefaultConfig(type);
 
-      // It's better to type newNode as WorkflowNode from the start
       const newNode: WorkflowNode = {
         id: `${type}-${Date.now()}`,
         type,
         position,
         data: {
-          label: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+          label: `New ${
+            type.charAt(0).toUpperCase() + type.slice(1).replace("_", " ")
+          }`, // Improved label
           type,
           status: "idle",
-          config: {},
+          config: defaultConfig,
+          error: undefined,
+          lastResult: undefined,
         },
       };
-
       addNode(newNode);
     },
     [screenToFlowPosition, addNode]

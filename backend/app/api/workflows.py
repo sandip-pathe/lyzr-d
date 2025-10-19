@@ -1,3 +1,5 @@
+#api/workflows.py
+
 """Workflow API endpoints - enhanced with pause/resume/reset"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc
@@ -110,28 +112,26 @@ async def execute_workflow(
     }
 
 @router.post("/{workflow_id}/pause")
-async def pause_workflow(workflow_id: str, execution_id: str):
-    """Pause running workflow"""
+async def pause_execution(workflow_id: str, execution_id: str):
+    """Pause running workflow execution"""
     client = await get_temporal_client()
-    handle = client.get_workflow_handle(execution_id)
-    
     try:
-        await handle.signal(OrchestrationWorkflow.pause)
-        return {"status": "paused", "execution_id": execution_id}
+        handle = client.get_workflow_handle(execution_id)
+        await handle.signal("pause")
+        return {"status": "pause_signal_sent", "execution_id": execution_id}
     except Exception as e:
-        raise HTTPException(500, f"Failed to pause: {str(e)}")
+        raise HTTPException(500, f"Failed to send pause signal: {str(e)}")
 
 @router.post("/{workflow_id}/resume")
-async def resume_workflow(workflow_id: str, execution_id: str):
-    """Resume paused workflow"""
+async def resume_execution(workflow_id: str, execution_id: str):
+    """Resume paused workflow execution"""
     client = await get_temporal_client()
-    handle = client.get_workflow_handle(execution_id)
-    
     try:
-        await handle.signal(OrchestrationWorkflow.resume)
-        return {"status": "resumed", "execution_id": execution_id}
+        handle = client.get_workflow_handle(execution_id)
+        await handle.signal("resume")
+        return {"status": "resume_signal_sent", "execution_id": execution_id}
     except Exception as e:
-        raise HTTPException(500, f"Failed to resume: {str(e)}")
+        raise HTTPException(500, f"Failed to send resume signal: {str(e)}")
 
 @router.get("/{workflow_id}/history")
 async def get_workflow_history(workflow_id: str, execution_id: str):

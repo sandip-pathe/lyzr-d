@@ -1,3 +1,5 @@
+#api/approvals.py
+
 """Approval API - enhanced with multi-approver support"""
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,7 +20,6 @@ async def respond_to_approval(
     response: ApprovalResponseSchema,
     db: Session = Depends(get_db)
 ):
-    """Approve/reject approval request with multi-approver support"""
     approval = db.query(ApprovalRequest).filter(
         ApprovalRequest.execution_id == execution_id,
         ApprovalRequest.status == "pending"
@@ -30,7 +31,6 @@ async def respond_to_approval(
     if response.action not in {"approve", "reject"}:
         raise HTTPException(400, "Invalid action")
     
-    # For multi-approver: store individual responses
     if not approval.approval_data:
         approval.approval_data = {"responses": []}
     
@@ -82,17 +82,25 @@ async def respond_to_approval(
     
     if should_proceed:
         approval.status = final_status
+        approval.resolved_at = datetime.now(timezone.utc).isoformat()
         db.commit()
         
         # Signal Temporal workflow
         client = await Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE)
         handle = client.get_workflow_handle(execution_id)
         
+        signal_data = {
+             "action": final_status,
+             "approver": response.approver,
+             "comment": response.comment,
+             "timestamp": datetime.now(timezone.utc).isoformat(),
+             # Optionally include all responses if workflow needs them
+        }
         await handle.signal(
-            OrchestrationWorkflow.approve,
-            {"action": final_status, "responses": responses}
+            "approval_signal", # <-- Pass the signal name as a string
+            signal_data
         )
-        
+
         return {"status": final_status, "execution_id": execution_id}
     else:
         db.commit()
