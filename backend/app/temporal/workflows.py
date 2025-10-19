@@ -12,7 +12,7 @@ with workflow.unsafe.imports_passed_through():
     from app.temporal.activities import (
         compensate_node, execute_agent_node, execute_api_call_node,
         execute_eval_node, execute_event_node, execute_merge_node,
-        execute_meta_node, execute_timer_node, get_fallback_agent,
+        execute_timer_node, get_fallback_agent,
         publish_workflow_status, request_ui_approval
     )
     from app.services.agent_executor import AgentExecutor
@@ -47,16 +47,6 @@ class OrchestrationWorkflow:
             "node_outputs": self.node_outputs,
             "previous_output": self.execution_history[-1].get("result") if self.execution_history else None
         }
-
-    def _resolve_input(self, node_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Resolves input mapping using the current state."""
-        mapping = node_config.get("input_mapping", {})
-        if not mapping:
-            return self._get_full_state().get("previous_output", {})
-
-
-        resolver = AgentExecutor()
-        return resolver.resolve_input(mapping, self._get_full_state())
 
     @workflow.run
     async def run(self, workflow_id: str, workflow_def: Dict[str, Any], input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -161,8 +151,20 @@ class OrchestrationWorkflow:
                     raise
 
             # --- Workflow Completion ---
-            final_output = self.node_outputs.get(current_node_id if current_node_id else self.execution_history[-1]["node_id"], None)
-            workflow.logger.info(f"✅ Workflow {workflow_id} completed successfully.")
+            # If we ended at an 'end' node, check if it should capture output from previous node
+            final_output = None
+            if current_node_id and node_map.get(current_node_id, {}).get("type") == "end":
+                end_node_config = node_map[current_node_id].get("data", {}).get("config", {})
+                if end_node_config.get("capture_output", True):
+                    # Get output from the last executed (non-end) node
+                    if self.execution_history:
+                        last_executed = self.execution_history[-1]
+                        final_output = last_executed.get("result")
+            else:
+                # If no end node, use output from the last node
+                final_output = self.node_outputs.get(current_node_id if current_node_id else self.execution_history[-1]["node_id"], None)
+            
+            workflow.logger.info(f"✅ Workflow {workflow_id} completed successfully. Final output: {final_output is not None}")
             await self._publish_status("completed", result=final_output)
             return {
                 "status": "completed",
@@ -191,25 +193,22 @@ class OrchestrationWorkflow:
         node_id = node.get("id", "")
         node_config = node.get("data", {}).get("config", {})
 
-        # Prepare input data using input_mapping if present
-        input_data = self._resolve_input(node_config)
-
         # Prepare context to pass to activities
         activity_context = {
             **self.workflow_context,
-            "node_outputs": self.node_outputs, # Pass outputs of previous nodes
+            "node_outputs": self.node_outputs,
             "current_node_id": node_id,
-            "current_input": input_data # Pass the resolved input
+            "previous_output": self.execution_history[-1].get("result") if self.execution_history else None
         }
 
         # Define default retry policy
         retry_policy = DEFAULT_ACTIVITY_RETRY_POLICY
 
         # Default timeout
-        timeout = timedelta(minutes=5) # Default to 5 mins
+        timeout = timedelta(minutes=5)
 
         if node_type == "agent":
-            timeout = timedelta(minutes=10) # Longer timeout for agents
+            timeout = timedelta(minutes=10)
             return await workflow.execute_activity(
                 execute_agent_node, args=[node, activity_context],
                 start_to_close_timeout=timeout, retry_policy=retry_policy
@@ -217,7 +216,7 @@ class OrchestrationWorkflow:
         elif node_type == "api_call":
             timeout = timedelta(minutes=2)
             return await workflow.execute_activity(
-                execute_api_call_node, args=[node, activity_context], # Renamed activity
+                execute_api_call_node, args=[node, activity_context],
                 start_to_close_timeout=timeout, retry_policy=retry_policy
             )
         elif node_type == "approval":
@@ -269,18 +268,8 @@ class OrchestrationWorkflow:
                  execute_event_node, args=[node, activity_context],
                  start_to_close_timeout=timeout, retry_policy=RetryPolicy(maximum_attempts=2)
              )
-        elif node_type == "meta":
-             timeout = timedelta(seconds=30)
-             return await workflow.execute_activity(
-                 execute_meta_node, args=[node, activity_context],
-                 start_to_close_timeout=timeout, retry_policy=RetryPolicy(maximum_attempts=1)
-             )
         elif node_type == "merge":
             timeout = timedelta(seconds=60)
-            # Merge logic requires knowing which branches are incoming.
-            # This needs careful state management, perhaps passed via activity_context
-            # based on workflow definition analysis before execution starts.
-            # Simplified for now: assumes activity can access needed prior outputs.
             return await workflow.execute_activity(
                 execute_merge_node, args=[node, activity_context],
                 start_to_close_timeout=timeout, retry_policy=RetryPolicy(maximum_attempts=1)
@@ -288,17 +277,12 @@ class OrchestrationWorkflow:
 
         # --- Nodes handled by workflow logic, not activities ---
         elif node_type == "trigger":
-            return self.workflow_context.get("input", {}) # Pass initial input forward
-        elif node_type == "fork":
-            # Forking logic happens in _get_next_node_id returning multiple IDs
-            # (Requires further implementation for parallel execution)
-             return {"status": "fork initiated"} # Placeholder result
+            return self.workflow_context.get("input", {})
         elif node_type == "conditional":
             # Conditional logic happens in _get_next_node_id
-            return {"status": "condition evaluated"} # Placeholder result
+            return {"status": "condition evaluated"}
         elif node_type == "end":
-             # Should be caught before _execute_node is called
-             return {"status": "workflow end"}
+            return {"status": "workflow end"}
 
         else:
             raise ApplicationError(f"Unknown node type: {node_type}", non_retryable=True)
@@ -377,30 +361,18 @@ class OrchestrationWorkflow:
         # --- Approval Logic ---
         elif node_type == "approval":
             # 'result' contains {'action': 'approved'|'rejected', ...}
-            action = result.get("action", "rejected") # Default to reject if missing
+            action = result.get("action", "rejected")
             handle_id = 'approve' if action == "approved" else 'reject'
             edge = next((e for e in edges if e.get("source") == current_id and e.get("sourceHandle") == handle_id), None)
             return edge.get("target") if edge else None
-
-        # --- Fork Logic (Simplified - Sequential, assumes one primary path out) ---
-        # For true parallel execution, Temporal Child Workflows or parallel Activities are needed.
-        elif node_type == "fork":
-            # Find all outgoing edges
-            outgoing_edges = [e for e in edges if e.get("source") == current_id]
-            if not outgoing_edges:
-                return None
-            # TODO: Implement proper parallel execution logic here if needed.
-            # For now, just follow the first edge found.
-            workflow.logger.warning("Fork node encountered, proceeding sequentially with the first branch.")
-            return outgoing_edges[0].get("target")
 
         # --- Default Logic (Follow the first outgoing edge) ---
         else:
             outgoing_edges = [e for e in edges if e.get("source") == current_id]
             if not outgoing_edges:
-                return None # End of a path
+                return None
             if len(outgoing_edges) > 1:
-                 workflow.logger.warning(f"Node {current_id} has multiple outgoing edges but isn't a Fork/Conditional/Approval. Following the first edge.")
+                 workflow.logger.warning(f"Node {current_id} has multiple outgoing edges but isn't a Conditional/Approval. Following the first edge.")
             return outgoing_edges[0].get("target")
 
     def _evaluate_condition(self, expression: str, current_result: Any) -> bool:
@@ -470,33 +442,17 @@ class OrchestrationWorkflow:
 
 
     @workflow.signal(name="approval_signal")
-    async def _handle_approval(self, approval_input: Dict[str, Any]) -> None:
-        """Handles the 'approve' or 'reject' signal."""
-        action = approval_input.get("action")
-        if action in ["approved", "rejected"]:
-            self._approval_status = action
-            self._approval_data = approval_input # Store full data (comment, approver)
-            workflow.logger.info(f"✅ Approval signal received: {action}")
-        else:
-            workflow.logger.warning(f"Received invalid approval action: {action}")
+    def approval_signal(self, data: dict) -> None:
+        self._approval_status = data.get("action")
+        self._approval_data = data
 
     @workflow.signal(name="pause")
-    async def _handle_pause(self) -> None:
-        """Pauses workflow execution."""
-        if not self._paused:
-            self._paused = True
-            workflow.logger.info("⏸️ Workflow paused")
-            # Optionally publish a status event
-            # await self._publish_status("paused")
+    def pause(self) -> None:
+        self._paused = True
 
     @workflow.signal(name="resume")
-    async def _handle_resume(self) -> None:
-        """Resumes workflow execution."""
-        if self._paused:
-            self._paused = False
-            workflow.logger.info("▶️ Workflow resumed")
-            # Optionally publish a status event
-            # await self._publish_status("resumed")
+    def resume(self) -> None:
+        self._paused = False
 
 
     # --- Queries ---
@@ -526,4 +482,4 @@ class OrchestrationWorkflow:
         # This is illustrative; direct access might not be standard/easy.
         # Typically rely on emitted signals/events or workflow state.
         return [] # Placeholder
-    
+

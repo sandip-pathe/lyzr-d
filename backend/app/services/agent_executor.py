@@ -1,5 +1,5 @@
 """Agent executor with parameter auto-tuning"""
-from typing import Optional
+from typing import Optional, Dict, Any
 import httpx
 from openai import AsyncOpenAI
 from app.core.config import settings
@@ -18,37 +18,23 @@ class AgentExecutor:
             "medium": 0.7,
             "high": 1.0
         }
-    
-    def resolve_input(self, mapping: dict, state: dict) -> dict:
-        """Resolve template variables in input mapping"""
-        result = {}
-        for key, template in mapping.items():
-            if isinstance(template, str) and "{{" in template and "}}" in template:
-                # Basic string interpolation for now
-                for state_key, state_value in state.items():
-                    if isinstance(state_value, dict):
-                        for sub_key, sub_value in state_value.items():
-                            template = template.replace(f"{{{{{state_key}.{sub_key}}}}}", str(sub_value))
-                    else:
-                        template = template.replace(f"{{{{{state_key}}}}}", str(state_value))
-                result[key] = template
-            else:
-                result[key] = template
-        return result
 
     async def execute(
         self, 
-        provider: str, 
-        agent_id: str, 
-        input_data: dict,
+        name: str,
+        system_instructions: str,
+        input_data: Dict[str, Any],
+        temperature: Optional[float] = 0.7,
+        expected_output_format: Optional[str] = None,
+        provider: str = "openai",
+        agent_id: str = "gpt-4o-mini",
         enable_auto_tuning: bool = False,
-        previous_eval_score: "Optional[float]" = None
+        previous_eval_score: Optional[float] = None
     ) -> dict:
-        """Execute agent with auto-tuning support"""
+        """Execute agent with new schema support"""
         start_time = time.time()
         
         # Auto-tune temperature based on previous eval score
-        temperature = None
         if enable_auto_tuning and previous_eval_score is not None:
             if previous_eval_score < 0.5:
                 temperature = self.temperature_ranges["high"]  # More creative
@@ -59,11 +45,16 @@ class AgentExecutor:
         
         try:
             if provider == "openai":
-                result = await self._execute_openai(agent_id, input_data, temperature)
+                result = await self._execute_openai(
+                    agent_id=agent_id,
+                    system_instructions=system_instructions,
+                    input_data=input_data,
+                    temperature=temperature,
+                    expected_output_format=expected_output_format
+                )
             elif provider == "lyzr":
                 result = await self._execute_lyzr(agent_id, input_data)
             elif provider in ["anthropic", "custom"]:
-                # Placeholder for other providers
                 result = await self._execute_custom(provider, agent_id, input_data)
             else:
                 raise ValueError(f"Unsupported provider: {provider}")
@@ -94,12 +85,46 @@ class AgentExecutor:
             
             raise
 
-    async def _execute_openai(self, agent_id: str, input_data: dict, temperature: Optional[float] = None) -> dict:
-        """Execute OpenAI agent"""
-        messages = input_data.get("messages")
-        if not messages:
-            prompt = input_data.get("prompt", "")
-            messages = [{"role": "user", "content": prompt}]
+    async def _execute_openai(
+        self,
+        agent_id: str,
+        system_instructions: str,
+        input_data: Dict[str, Any],
+        temperature: Optional[float] = None,
+        expected_output_format: Optional[str] = None
+    ) -> dict:
+        """Execute OpenAI agent with new schema"""
+        # Build messages from input_data
+        messages = []
+        
+        # Add system message
+        messages.append({"role": "system", "content": system_instructions})
+        
+        # Add expected output format if provided
+        if expected_output_format:
+            messages.append({
+                "role": "system",
+                "content": f"Expected output format: {expected_output_format}"
+            })
+        
+        # Handle input_data - could be text or structured
+        if isinstance(input_data, dict):
+            if "prompt" in input_data:
+                messages.append({"role": "user", "content": str(input_data["prompt"])})
+            elif "input_text" in input_data:
+                # Handle trigger input_text field
+                messages.append({"role": "user", "content": str(input_data["input_text"])})
+            elif "messages" in input_data:
+                messages.extend(input_data["messages"])
+            else:
+                # Convert dict to a readable format
+                import json
+                messages.append({
+                    "role": "user",
+                    "content": json.dumps(input_data, indent=2)
+                })
+        else:
+            messages.append({"role": "user", "content": str(input_data)})
 
         params = {
             "model": agent_id,

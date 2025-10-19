@@ -42,12 +42,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(workflows.router)
-app.include_router(approvals.router)
-app.include_router(executions.router)
-app.include_router(node_types.router)
-app.include_router(events.router)
-app.include_router(metrics.router)
+app.include_router(workflows.router, prefix="/api")
+app.include_router(approvals.router, prefix="/api")
+app.include_router(executions.router, prefix="/api")
+app.include_router(node_types.router, prefix="/api")
+app.include_router(events.router, prefix="/api")
+app.include_router(metrics.router, prefix="/api")
 
 
 @app.get("/")

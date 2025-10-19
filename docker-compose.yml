@@ -13,6 +13,22 @@ services:
       - redis
       - temporal
 
+  worker:
+    build: ./backend
+    container_name: orchestrator-worker
+    command: python -u -m app.temporal.worker
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - postgres
+      - redis
+      - temporal
+    restart: unless-stopped
+
   postgres:
     image: postgres:15-alpine
     container_name: orchestrator-postgres

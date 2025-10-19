@@ -8,8 +8,8 @@ import { WorkflowNode } from "@/types/workflow";
 
 export const EventHubNode = memo(
   ({ data, selected }: NodeProps<WorkflowNode>) => {
-    const throughput = data.config?.throughput || 0;
-    const topics = data.config?.topics || [];
+    const throughput = ((data as any)?.config?.throughput as number) || 0;
+    const topics = ((data as any)?.config?.topics as string[]) || [];
 
     return (
       <motion.div
@@ -51,7 +51,7 @@ export const EventHubNode = memo(
               Event Hub
             </div>
             <div className="text-xs opacity-90 font-medium">
-              {data.config.label}
+              {data.label || "No label"}
             </div>
 
             {throughput > 0 && (

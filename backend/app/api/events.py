@@ -64,15 +64,26 @@ async def replay_execution_events(execution_id: str, from_timestamp: Optional[fl
     return {"execution_id": execution_id, "events": events, "count": len(events)}
 
 async def push_to_websocket_clients(event_data: dict):
-    workflow_id = event_data.get("data", {}).get("workflow_id")
-    execution_id = event_data.get("data", {}).get("execution_id")
-
-    # Parse the inner 'data' string into an object before broadcasting
+    """
+    Broadcast events to WebSocket clients.
+    event_data structure: {"event_type": str, "data": str (JSON), "timestamp": str}
+    """
+    # Parse the inner 'data' string into an object first
     try:
         if isinstance(event_data.get("data"), str):
-            event_data["data"] = json.loads(event_data["data"])
-    except json.JSONDecodeError:
-        pass # Or log an error if parsing fails
+            parsed_data = json.loads(event_data["data"])
+            event_data["data"] = parsed_data
+        else:
+            parsed_data = event_data.get("data", {})
+    except json.JSONDecodeError as e:
+        print(f"❌ Failed to parse event data: {e}")
+        return
+
+    # Now extract IDs from the parsed data
+    workflow_id = parsed_data.get("workflow_id")
+    execution_id = parsed_data.get("execution_id")
+    
+    print(f"📨 Broadcasting event {event_data.get('event_type')} to execution:{execution_id}")
 
     if workflow_id:
         await manager.broadcast(f"workflow:{workflow_id}", event_data)

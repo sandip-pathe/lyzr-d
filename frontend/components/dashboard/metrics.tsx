@@ -20,13 +20,13 @@ import { Progress } from "@/components/ui/progress";
 
 // API fetching functions
 async function fetchSummaryMetrics() {
-  const res = await fetch(`http://localhost:8000/metrics/summary`);
+  const res = await fetch(`http://localhost:8000/api/metrics/summary`);
   if (!res.ok) throw new Error("Failed to fetch summary metrics.");
   return res.json();
 }
 
 async function fetchAgentMetrics() {
-  const res = await fetch(`http://localhost:8000/metrics/agents`);
+  const res = await fetch(`http://localhost:8000/api/metrics/agents`);
   if (!res.ok) throw new Error("Failed to fetch agent metrics.");
   return res.json();
 }

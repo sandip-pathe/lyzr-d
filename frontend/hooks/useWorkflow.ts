@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 async function fetchWorkflow(workflowId: string) {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/workflows/${workflowId}`
+    `${process.env.NEXT_PUBLIC_API_URL}/api/workflows/${workflowId}`
   );
   if (!res.ok) {
     throw new Error("Network response was not ok");
@@ -27,8 +27,10 @@ export function useWorkflow(workflowId: string) {
     if (data) {
       setWorkflowId(data.id);
       setWorkflowName(data.name);
-      setNodes(data.nodes || []);
-      setEdges(data.edges || []);
+      // Changed to extract nodes and edges from data.definition
+      const definition = data.definition || {};
+      setNodes(definition.nodes || []);
+      setEdges(definition.edges || []);
     }
   }, [data, setWorkflowId, setWorkflowName, setNodes, setEdges]);
 

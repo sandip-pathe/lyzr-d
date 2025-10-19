@@ -1,22 +1,18 @@
 // frontend/types/workflow.ts
-// --- UPDATED ---
+// --- UPDATED for simplified node schema ---
 
 import { Node, Edge } from "@xyflow/react";
 
-// NodeType, NodeStatus, WorkflowMode, LayoutType enums remain the same
 export type NodeType =
   | "trigger"
   | "agent"
   | "api_call"
   | "approval"
   | "conditional"
-  | "hitl"
   | "timer"
-  | "fork"
   | "merge"
   | "event"
   | "eval"
-  | "meta"
   | "end";
 
 export type NodeStatus =
@@ -36,73 +32,71 @@ export type WorkflowMode =
 
 export type LayoutType = "dag" | "event-hub";
 
-// --- Configuration Types (Matching Pydantic Schemas) ---
-
-// Add 'export' keyword to all interfaces and the type alias below
-export interface BaseNodeConfig {
-  input_mapping?: Record<string, any>;
-  output_mapping?: Record<string, string>;
-}
+// --- Configuration Types (Matching Backend Pydantic Schemas) ---
 
 export interface TriggerConfig {
-  type: "manual" | "schedule" | "webhook";
-  schedule?: string;
-  webhook_url?: string;
+  name: string;
+  type: "manual" | "event";
+  input_text?: string;
+  input_json?: Record<string, any>;
 }
 
-export interface AgentConfig extends BaseNodeConfig {
-  provider: string;
-  agent_id: string;
+export interface AgentConfig {
+  name: string;
   temperature?: number;
+  system_instructions: string;
+  expected_output_format?: string;
+  // Legacy fields for backward compatibility
+  provider?: string;
+  agent_id?: string;
 }
 
-export interface ApiCallConfig extends BaseNodeConfig {
+export interface ApiCallConfig {
+  name: string;
   url: string;
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; // More specific
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   headers?: Record<string, string>;
-  body_template?: Record<string, any>;
+  body?: Record<string, any>;
 }
 
-export interface ApprovalConfig extends BaseNodeConfig {
-  title: string;
-  description: string;
-  approvers: string[];
-  channels: ("slack" | "email")[];
-}
-
-export interface ConditionalConfig extends BaseNodeConfig {
+export interface ConditionalConfig {
+  name: string;
   condition_expression: string;
 }
 
-export interface EvalConfig extends BaseNodeConfig {
+export interface EndConfig {
+  name: string;
+  capture_output?: boolean;
+  show_output?: boolean;
+}
+
+export interface ApprovalConfig {
+  name: string;
+  description: string;
+}
+
+export interface EvalConfig {
+  name: string;
   eval_type: "schema" | "llm_judge" | "policy" | "custom";
-  config: Record<string, any>; // Could be further typed based on eval_type
+  config: Record<string, any>;
   on_failure: "block" | "warn" | "retry" | "compensate";
 }
 
-export interface ForkConfig {
-  branch_count?: number;
-}
-
-export interface MergeConfig extends BaseNodeConfig {
+export interface MergeConfig {
+  name: string;
   merge_strategy: "combine" | "first" | "vote";
 }
 
-export interface TimerConfig {
-  duration_seconds: number;
-}
-
-export interface EventConfig extends BaseNodeConfig {
+export interface EventConfig {
+  name: string;
   operation: "publish" | "subscribe";
   channel: string;
 }
 
-export interface MetaConfig extends BaseNodeConfig {
-  operation: "observe" | string; // Allow custom operations?
-  metrics_to_capture: string[];
+export interface TimerConfig {
+  name: string;
+  duration_seconds: number;
 }
-
-export interface EndConfig {}
 
 // --- Union Type for Specific Configs ---
 export type SpecificNodeConfig =
@@ -112,11 +106,9 @@ export type SpecificNodeConfig =
   | ApprovalConfig
   | ConditionalConfig
   | EvalConfig
-  | ForkConfig
   | MergeConfig
   | TimerConfig
   | EventConfig
-  | MetaConfig
   | EndConfig;
 
 // --- NodeData Interface ---

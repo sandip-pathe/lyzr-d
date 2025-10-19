@@ -21,21 +21,39 @@ agent_executor_util = AgentExecutor()
 
 @activity.defn
 async def execute_agent_node(node: dict, activity_context: dict) -> dict:
-    """Execute agent node using resolved input."""
+    """Execute agent node using new schema."""
     node_data = node.get("data", {})
     node_config = node_data.get("config", {})
-    input_data = activity_context.get("current_input", {}) # Use resolved input
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Agent")
+    system_instructions = node_config.get("system_instructions", "You are a helpful assistant.")
+    temperature = node_config.get("temperature", 0.7)
+    expected_output_format = node_config.get("expected_output_format")
+    
+    # Legacy support for provider/agent_id
+    provider = node_config.get("provider", "openai")
+    agent_id = node_config.get("agent_id", "gpt-4o-mini")
+    
+    # Get input from previous node or workflow context
+    previous_output = activity_context.get("previous_output", {})
+    workflow_input = activity_context.get("input", {})
+    
+    # Prepare input_data for the agent
+    input_data = previous_output if previous_output else workflow_input
 
-    activity.logger.info(f"Executing agent node {node.get('id')} with input: {input_data}")
+    activity.logger.info(f"Executing agent node '{name}' with model {agent_id}")
 
     result = await agent_executor_util.execute(
-        provider=node_config.get("provider", "openai"),
-        agent_id=node_config.get("agent_id"),
-        input_data=input_data, # Pass the resolved input data
-        # Add auto-tuning/previous_eval_score if needed from activity_context
+        name=name,
+        system_instructions=system_instructions,
+        input_data=input_data,
+        temperature=temperature,
+        expected_output_format=expected_output_format,
+        provider=provider,
+        agent_id=agent_id
     )
 
-    # Publishing event is now handled by the workflow using publish_generic_event
     return result
 
 @activity.defn
@@ -59,104 +77,102 @@ async def compensate_node(node: dict, state: dict):
 
 @activity.defn
 async def execute_api_call_node(node: dict, activity_context: dict) -> dict:
-    """Execute API Call node using resolved input and body template."""
+    """Execute API Call node using new schema."""
     node_data = node.get("data", {})
     node_config = node_data.get("config", {})
-    input_data = activity_context.get("current_input", {}) # Use resolved input
-
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed API Call")
     url = node_config.get("url")
     method = node_config.get("method", "POST")
     headers = node_config.get("headers", {})
-    body_template = node_config.get("body_template", {})
+    body = node_config.get("body", {})
+    
+    if not url:
+        raise ValueError(f"API Call node '{name}' requires a URL")
 
-    # Resolve body template using the input data
-    # (Using the same logic as input_mapping resolution for simplicity)
-    request_body = agent_executor_util.resolve_input(body_template, {"input": input_data, **activity_context})
+    # Get input from previous node for dynamic body values
+    previous_output = activity_context.get("previous_output", {})
+    
+    # Merge previous output into body if needed
+    request_body = {**body}
+    if previous_output and isinstance(previous_output, dict):
+        # Simple merge - can be enhanced with template resolution
+        request_body = {**request_body, "input": previous_output}
 
-    activity.logger.info(f"Executing API call to {method} {url} with body: {request_body}")
+    activity.logger.info(f"Executing API call '{name}' to {method} {url}")
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method=method,
                 url=url,
-                json=request_body,
+                json=request_body if method != "GET" else None,
                 headers=headers,
-                timeout=60.0, # Increased timeout
+                timeout=60.0,
             )
-            response.raise_for_status() # Raise exception for 4xx/5xx responses
+            response.raise_for_status()
             result = {
                 "status_code": response.status_code,
                 "body": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
                 "headers": dict(response.headers)
             }
-        activity.logger.info(f"API call successful: Status {result['status_code']}")
+        activity.logger.info(f"API call '{name}' successful: Status {result['status_code']}")
         return result
     except httpx.HTTPStatusError as e:
-        activity.logger.error(f"API call failed: Status {e.response.status_code}, Response: {e.response.text}")
-        # Re-raise as an activity error so Temporal handles retries/failure
+        activity.logger.error(f"API call '{name}' failed: Status {e.response.status_code}, Response: {e.response.text}")
         raise RuntimeError(f"API call failed with status {e.response.status_code}: {e.response.text}") from e
     except httpx.RequestError as e:
-        activity.logger.error(f"API call request error: {e}")
+        activity.logger.error(f"API call '{name}' request error: {e}")
         raise RuntimeError(f"API call request error: {e}") from e
 
 
-# --- Updated: execute_merge_node ---
 @activity.defn
 async def execute_merge_node(node: dict, activity_context: dict) -> dict:
     """Merge results from parallel branches based on strategy."""
-    node_id = node.get("id")
     node_config = node.get("data", {}).get("config", {})
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Merge")
     merge_strategy = node_config.get("merge_strategy", "combine")
+    
     node_outputs = activity_context.get("node_outputs", {})
-
-    # --- Logic to find incoming node IDs (Requires Workflow Definition Access or Context Passing) ---
-    # This is a complex part. Ideally, the workflow knows which nodes feed into the merge.
-    # For now, let's assume the context *could* contain IDs of completed branches,
-    # or we infer based on naming conventions or graph structure analysis (less reliable in activity).
-    # Simplified: We'll look for keys in node_outputs that *might* be from branches.
-    # A better approach: The workflow passes the specific node IDs of the branches to merge.
-    # Let's assume activity_context['incoming_branch_node_ids'] = ['node_a', 'node_b'] exists.
-    incoming_branch_node_ids = activity_context.get("incoming_branch_node_ids", []) # Needs to be populated by workflow
+    incoming_branch_node_ids = activity_context.get("incoming_branch_node_ids", [])
     branch_results = [node_outputs.get(branch_id) for branch_id in incoming_branch_node_ids if branch_id in node_outputs]
 
     activity.logger.info(f"Merging results from branches {incoming_branch_node_ids} using strategy '{merge_strategy}'")
 
     merged_result: Any = None
     if not branch_results:
-        activity.logger.warning(f"No branch results found for merge node {node_id}")
+        activity.logger.warning(f"No branch results found for merge node '{name}'")
         merged_result = {"warning": "No branch results to merge", "results": []}
 
     elif merge_strategy == "combine":
-        # Combine into a list or dictionary
         merged_result = {"merged_results": branch_results}
-        # Or combine into a dict if branch IDs are meaningful keys:
-        # merged_result = {branch_id: node_outputs.get(branch_id) for branch_id in incoming_branch_node_ids if branch_id in node_outputs}
 
     elif merge_strategy == "first":
         merged_result = branch_results[0]
 
     elif merge_strategy == "vote":
-        # Simple voting based on string representation (can be customized)
         try:
-            votes = [json.dumps(r, sort_keys=True) for r in branch_results] # Make hashable
+            votes = [json.dumps(r, sort_keys=True) for r in branch_results]
         except TypeError:
-             votes = [str(r) for r in branch_results] # Fallback
+             votes = [str(r) for r in branch_results]
         if votes:
             most_common_vote_str = Counter(votes).most_common(1)[0][0]
             try:
-                winner = json.loads(most_common_vote_str) # Try converting back
+                winner = json.loads(most_common_vote_str)
             except json.JSONDecodeError:
-                winner = most_common_vote_str # Keep as string if not valid JSON
+                winner = most_common_vote_str
             merged_result = {"winner": winner, "all_votes": branch_results}
         else:
             merged_result = {"winner": None, "all_votes": []}
 
-    else: # Default to combine
+    else:
         activity.logger.warning(f"Unknown merge strategy '{merge_strategy}', defaulting to 'combine'")
         merged_result = {"merged_results": branch_results}
 
-    activity.logger.info(f"Merge result: {merged_result}")
+    activity.logger.info(f"Merge '{name}' completed")
     return merged_result
 
 
@@ -224,94 +240,76 @@ async def send_approval_request(node: dict, activity_context: dict) -> dict:
         "context": previous_output, # Send context in the event too
     })
 
-    # --- Optional: Send external notifications ---
-    # from app.services.notification import NotificationService
-    # notification_service = NotificationService()
-    # try:
-    #     await notification_service.send_approval(
-    #         workflow_id=workflow_id,
-    #         node_id=node_id,
-    #         title=title,
-    #         description=description,
-    #         approvers=approvers,
-    #         channels=[ch for ch in channels if ch != "ui"] # Exclude UI channel
-    #     )
-    # except Exception as e:
-    #     activity.logger.error(f"Failed to send external approval notification: {e}")
-    # --- End Optional ---
 
 
     activity.logger.info(f"Approval request '{approval_id}' sent for node {node_id}")
     return {"approval_id": approval_id, "status": "pending"}
 
-# Ensure execute_eval_node uses activity_context correctly
 @activity.defn
 async def execute_eval_node(node: dict, activity_context: dict) -> dict:
-    """Execute eval/compliance node using resolved input."""
+    """Execute eval/compliance node using new schema."""
     node_config = node.get("data", {}).get("config", {})
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Eval")
     eval_type = node_config.get("eval_type", "schema")
-    # Eval usually operates on the *previous* node's output
+    eval_specific_config = node_config.get("config", {})
+    on_failure = node_config.get("on_failure", "block")
+    
+    # Eval usually operates on the previous node's output
     input_to_evaluate = activity_context.get("previous_output", {})
-    eval_specific_config = node_config.get("config", {}) # The nested config dict
 
-    activity.logger.info(f"Evaluating input for node {node.get('id')} using type '{eval_type}'")
+    activity.logger.info(f"Evaluating input for node '{name}' using type '{eval_type}'")
 
     result = await eval_service.evaluate(eval_type, input_to_evaluate, eval_specific_config)
+    
+    # Add on_failure to result for workflow to handle
+    result["on_failure"] = on_failure
 
-    # Publishing event is now handled by the workflow using publish_generic_event
-
-    # Note: Failure handling logic (block/compensate/retry/warn) is now primarily in the workflow itself.
-    # The activity just returns the evaluation result.
     return result
 
-# Timer, Event, Meta activities likely need minimal changes, just ensure they use activity_context if accessing state
 @activity.defn
 async def execute_timer_node(node: dict, activity_context: dict) -> dict:
     """Logs start/end for timer node (actual sleep is in workflow)."""
-    node_id = node.get("id")
     node_config = node.get("data", {}).get("config", {})
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Timer")
     duration_seconds = node_config.get("duration_seconds", 0)
 
-    # Log start event immediately
-    # Publishing event is now handled by the workflow using publish_generic_event
+    activity.logger.info(f"Timer node '{name}' activity started (wait duration: {duration_seconds}s)")
 
-    # The actual wait happens via workflow.sleep() in the workflow code
-    # This activity now mainly serves logging purposes if needed, or could be removed
-    # if workflow._publish_node_event is sufficient.
-    activity.logger.info(f"Timer node {node_id} activity started (wait duration: {duration_seconds}s)")
-
-    # Simulate completion logging after the sleep would have occurred
-    return {"waited_seconds": duration_seconds} # Result reflects the intended duration
+    return {"waited_seconds": duration_seconds}
 
 
 @activity.defn
 async def execute_event_node(node: dict, activity_context: dict) -> dict:
-    """Publish or subscribe to event."""
+    """Publish or subscribe to event using new schema."""
     node_config = node.get("data", {}).get("config", {})
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Event")
     operation = node_config.get("operation", "publish")
     channel = node_config.get("channel")
-    input_data = activity_context.get("current_input", {}) # Use resolved input for payload
 
     if not channel:
-         raise ValueError("Event node requires a 'channel' in its config")
+         raise ValueError(f"Event node '{name}' requires a 'channel' in its config")
+
+    previous_output = activity_context.get("previous_output", {})
 
     if operation == "publish":
         payload = {
             "workflow_id": activity_context.get("workflow_id"),
             "execution_id": activity_context.get("execution_id"),
             "node_id": node.get("id"),
-            "payload": input_data # Use the resolved input as the event payload
+            "payload": previous_output
         }
         await event_bus.publish(channel, payload)
-        activity.logger.info(f"Published event to channel '{channel}'")
+        activity.logger.info(f"Event node '{name}' published to channel '{channel}'")
         return {"operation": "published", "channel": channel}
 
     elif operation == "subscribe":
-        # Subscription logic is more complex in Temporal.
-        # It might involve waiting for a signal, using long-running activities,
-        # or external triggers starting a workflow.
-        # This activity can't easily block and wait for an external event.
-        activity.logger.warning("Event 'subscribe' operation is not fully implemented in this activity.")
+        activity.logger.warning(f"Event node '{name}': 'subscribe' operation is not fully implemented in this activity.")
         return {"operation": "subscribe_attempted", "channel": channel}
 
     else:
@@ -358,28 +356,25 @@ async def publish_workflow_status(execution_id: str, workflow_id: str, status: s
 
 @activity.defn
 async def request_ui_approval(node: dict, activity_context: dict) -> dict:
-    """Publish an event specifically for the UI to request approval."""
-    node_id = node.get("id")
+    """Publish an event specifically for the UI to request approval using new schema."""
     node_config = node.get("data", {}).get("config", {})
-    prompt = node_config.get("prompt", "Do you approve this step?") # Using schema field
-    title = node_config.get("title", "Approval Required")
-    description = node_config.get("description", prompt) # Use prompt as fallback description
-    previous_output = activity_context.get("previous_output", {}) # Get previous node's output
-
-    approval_id = str(uuid4()) # Generate a unique ID for this specific request instance
+    
+    # Extract config based on new schema
+    name = node_config.get("name", "Unnamed Approval")
+    description = node_config.get("description", "Please review and approve this step.")
+    
+    previous_output = activity_context.get("previous_output", {})
+    approval_id = str(uuid4())
 
     await event_bus.publish("ui.approval.requested", {
         "workflow_id": activity_context.get("workflow_id"),
         "execution_id": activity_context.get("execution_id"),
-        "node_id": node_id,
-        "approval_id": approval_id, # Include the unique ID
-        "title": title,
+        "node_id": node.get("id"),
+        "approval_id": approval_id,
+        "title": name,
         "description": description,
-        "context": previous_output # Pass previous node output as context for the UI modal
+        "context": previous_output
     })
 
-    activity.logger.info(f"UI approval request '{approval_id}' sent for node {node_id}")
-    # Persist request? Maybe not needed if UI signal includes approval_id
-    # DB persistence happens in send_approval_request if used for external notifications
-
+    activity.logger.info(f"UI approval request '{approval_id}' sent for node '{name}'")
     return {"status": "ui_approval_sent", "approval_id": approval_id}

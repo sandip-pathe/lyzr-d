@@ -6,7 +6,6 @@ import { useWorkflow } from "@/hooks/useWorkflow";
 import { motion, AnimatePresence } from "framer-motion";
 import { ApprovalModal } from "@/components/modals/approval";
 import { EventLogStream } from "@/components/sidebar/event-log";
-import { PropertiesPanel } from "@/components/sidebar/properties";
 import { WorkflowCanvas } from "@/components/canvas/canvas";
 import { useWorkflowStore } from "@/lib/store";
 import { ExecutionToolbar } from "@/components/toolbar/top";
@@ -16,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import { NarrationModal } from "@/components/modals/narration";
 import { OutputPanel } from "@/components/sidebar/output";
 import { NodePalette } from "@/components/sidebar/node-pallete";
+import { PropertiesPanel } from "@/components/sidebar/properties";
 
 export default function WorkflowEditorPage({
   params,
@@ -50,7 +50,7 @@ export default function WorkflowEditorPage({
     }) => {
       if (!currentApproval) throw new Error("No approval request active.");
       return fetch(
-        `http://localhost:8000/approvals/${currentApproval.executionId}/approve`,
+        `http://localhost:8000/api/approvals/${currentApproval.executionId}/approve`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -77,9 +77,9 @@ export default function WorkflowEditorPage({
     queryKey: ["narration", executionId],
     queryFn: () =>
       executionId
-        ? fetch(`http://localhost:8000/executions/${executionId}/narrate`).then(
-            (res) => res.json()
-          )
+        ? fetch(
+            `http://localhost:8000/api/executions/${executionId}/narrate`
+          ).then((res) => res.json())
         : null,
     enabled: false,
   });

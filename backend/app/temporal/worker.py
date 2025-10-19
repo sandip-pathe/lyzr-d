@@ -25,10 +25,16 @@ from app.temporal.activities import (
 
 async def main():
     """Start Temporal worker"""
+    print("🔨 Starting Temporal Worker...")
+    print(f"📡 Connecting to: {settings.TEMPORAL_HOST}")
+    print(f"🔧 Namespace: {settings.TEMPORAL_NAMESPACE}")
+    
     client = await Client.connect(
         settings.TEMPORAL_HOST,
         namespace=settings.TEMPORAL_NAMESPACE
     )
+    
+    print("✅ Connected to Temporal!")
 
     # Define the list of all activities to register
     activities_list = [
@@ -55,7 +61,8 @@ async def main():
         activities=activities_list # Pass the full list
     )
 
-    print(f"Registered activities ⚡: {[a.__name__ for a in activities_list]}")
+    print(f"⚡ Registered activities: {[a.__name__ for a in activities_list]}")
+    print("🚀 Worker is now polling for tasks...")
 
     await worker.run()
 

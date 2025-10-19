@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 interface WebSocketMessageStructure {
   event_type: string;
-  data: string;
+  data: string | Record<string, any>; // Can be string or already parsed object
   timestamp: string;
 }
 
@@ -40,7 +40,7 @@ export function useWorkflowWebSocket(
       return;
     }
 
-    const wsUrl = `ws://localhost:8000/events/ws/executions/${executionId}`;
+    const wsUrl = `ws://localhost:8000/api/events/ws/executions/${executionId}`;
     console.log("[WebSocket] Attempting to connect to:", wsUrl);
     const ws = new WebSocket(wsUrl);
 
@@ -56,10 +56,13 @@ export function useWorkflowWebSocket(
         const outerMessage: WebSocketMessageStructure = JSON.parse(event.data);
         const event_type = outerMessage.event_type;
         const timestampStr = outerMessage.timestamp; // String float timestamp
-        const innerDataString = outerMessage.data; // Inner data payload as JSON string
+        const innerData = outerMessage.data; // Inner data payload
 
-        // 2. Parse the inner data payload
-        const eventData = JSON.parse(innerDataString || "{}");
+        // 2. Parse the inner data payload if it's a string, otherwise use as-is
+        const eventData =
+          typeof innerData === "string"
+            ? JSON.parse(innerData || "{}")
+            : innerData;
 
         // Derive event type suffix (e.g., 'started', 'completed')
         const eventTypeSuffix = event_type.includes(".")

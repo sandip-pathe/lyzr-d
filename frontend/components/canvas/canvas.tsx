@@ -36,7 +36,8 @@ import {
   EvalConfig,
   TimerConfig,
   EventConfig,
-  MetaConfig,
+  MergeConfig,
+  EndConfig,
   SpecificNodeConfig,
 } from "@/types/workflow";
 
@@ -45,62 +46,83 @@ const nodeTypes: NodeTypes = {
   agent: CustomNode,
   api_call: CustomNode,
   approval: CustomNode,
-  hitl: CustomNode,
   conditional: CustomNode,
   eval: CustomNode,
-  fork: CustomNode,
   merge: CustomNode,
   timer: CustomNode,
   event: EventHubNode,
-  meta: CustomNode,
   end: CustomNode,
 };
 
 const snapGrid: [number, number] = [15, 15];
 
-const getDefaultConfig = (type: NodeType): SpecificNodeConfig | {} => {
+const getDefaultConfig = (type: NodeType): SpecificNodeConfig => {
   switch (type) {
     case "trigger":
-      return { type: "manual" } as TriggerConfig;
+      return {
+        name: "New Trigger",
+        type: "manual",
+        input_text: "",
+      } as TriggerConfig;
     case "agent":
-      return { provider: "openai", agent_id: "" } as AgentConfig; // Provide defaults
+      return {
+        name: "New Agent",
+        system_instructions: "",
+        temperature: 0.7,
+        expected_output_format: "text",
+      } as AgentConfig;
     case "api_call":
       return {
+        name: "New API Call",
         url: "",
         method: "POST",
         headers: {},
-        body_template: {},
+        body: {},
       } as ApiCallConfig;
     case "approval":
       return {
-        title: "Approval Required",
-        description: "",
-        approvers: [],
-        channels: ["email"],
+        name: "New Approval",
+        description: "Please review and approve",
       } as ApprovalConfig;
     case "conditional":
-      return { condition_expression: "" } as ConditionalConfig;
-    case "eval":
-      // Needs a default eval_type and nested config
       return {
+        name: "New Conditional",
+        condition_expression: "",
+      } as ConditionalConfig;
+    case "eval":
+      return {
+        name: "New Evaluation",
         eval_type: "schema",
         config: {},
         on_failure: "block",
       } as EvalConfig;
     case "timer":
-      return { duration_seconds: 30 } as TimerConfig;
-    case "event":
-      return { operation: "publish", channel: "" } as EventConfig;
-    case "meta":
       return {
-        operation: "observe",
-        metrics_to_capture: ["status"],
-      } as MetaConfig;
-    case "fork":
+        name: "New Timer",
+        duration_seconds: 30,
+      } as TimerConfig;
+    case "event":
+      return {
+        name: "New Event",
+        operation: "publish",
+        channel: "",
+      } as EventConfig;
     case "merge":
+      return {
+        name: "New Merge",
+        merge_strategy: "combine",
+      };
     case "end":
+      return {
+        name: "End Node",
+        capture_output: true,
+        show_output: true,
+      };
     default:
-      return {}; // These might not need specific config initially
+      const _exhaustive: never = type;
+      return {
+        name: "Unknown Node",
+      } as any;
   }
 };
 
@@ -245,14 +267,11 @@ function WorkflowCanvasInner() {
               agent: "#a855f7",
               api_call: "#3b82f6",
               approval: "#f97316",
-              hitl: "#f97316",
               conditional: "#4f46e5",
               eval: "#eab308",
-              fork: "#ec4899",
               merge: "#6366f1",
               timer: "#06b6d4",
               event: "#ef4444",
-              meta: "#6b7280",
               end: "#1f2937",
             };
             return colors[node.type as NodeType] || "#6b7280";

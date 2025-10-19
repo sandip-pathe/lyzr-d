@@ -17,7 +17,7 @@ import { timeAgo } from "@/lib/utils";
 
 // API function to fetch all workflows from the backend
 async function fetchWorkflows() {
-  const res = await fetch(`http://localhost:8000/workflows/`);
+  const res = await fetch(`http://localhost:8000/api/workflows/`);
   if (!res.ok) {
     throw new Error("Failed to fetch workflows.");
   }
@@ -26,7 +26,7 @@ async function fetchWorkflows() {
 
 // API function to create a new, empty workflow
 async function createNewWorkflow() {
-  const res = await fetch(`http://localhost:8000/workflows/`, {
+  const res = await fetch(`http://localhost:8000/api/workflows/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

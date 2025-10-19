@@ -52,10 +52,10 @@ def validate_workflow(workflow_definition: Dict[str, Any]) -> List[str]:
         if node_type != "trigger" and not incoming_edges:
             errors.append(f"Node '{label}' ({node_id}) has no incoming connections.")
 
-        if node_type != "end" and not outgoing_edges:
-             # Exception: Nodes like API calls might intentionally not lead anywhere sometimes?
-             # Revisit if this rule is too strict. For now, require end nodes.
-             errors.append(f"Node '{label}' ({node_id}) has no outgoing connections.")
+        # Only require outgoing connections if node is not an end node AND it's not intentionally terminal
+        # Allow nodes to terminate workflow if they don't have outgoing edges
+        # if node_type != "end" and not outgoing_edges:
+        #     errors.append(f"Node '{label}' ({node_id}) has no outgoing connections.")
 
         # Type-specific validation
         if node_type == "api_call":
