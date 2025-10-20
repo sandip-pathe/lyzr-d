@@ -133,42 +133,6 @@ export const CustomNode = memo(
               />
             </>
           );
-        case "fork":
-          return (
-            <>
-              <Handle type="target" position={Position.Top} id="input" />
-              <Handle
-                type="source"
-                position={Position.Bottom}
-                id="output1"
-                style={{ left: "25%" }}
-              />
-              <Handle
-                type="source"
-                position={Position.Bottom}
-                id="output2"
-                style={{ left: "75%" }}
-              />
-            </>
-          );
-        case "merge":
-          return (
-            <>
-              <Handle
-                type="target"
-                position={Position.Top}
-                id="input1"
-                style={{ left: "25%" }}
-              />
-              <Handle
-                type="target"
-                position={Position.Top}
-                id="input2"
-                style={{ left: "75%" }}
-              />
-              <Handle type="source" position={Position.Bottom} id="output" />
-            </>
-          );
         case "event":
           return (
             <>
