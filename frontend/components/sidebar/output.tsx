@@ -93,22 +93,19 @@ export function OutputPanel() {
               )}
 
               {/* Node Outputs */}
-              {output.node_outputs &&
-                Object.keys(output.node_outputs).length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm text-gray-600">
-                      Node Execution Details
-                    </h4>
-                    {Object.entries(output.node_outputs).map(
-                      ([nodeId, nodeOutput]) => (
-                        <NodeOutputCard
-                          key={nodeId}
-                          output={nodeOutput as NodeOutput}
-                        />
-                      )
-                    )}
-                  </div>
-                )}
+              {output.result && Object.keys(output.result).length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-gray-600">
+                    Node Execution Details
+                  </h4>
+                  {Object.entries(output.result).map(([nodeId, nodeOutput]) => (
+                    <NodeOutputCard
+                      key={nodeId}
+                      output={nodeOutput as NodeOutput}
+                    />
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">

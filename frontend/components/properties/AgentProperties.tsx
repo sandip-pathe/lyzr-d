@@ -102,7 +102,7 @@ export function AgentProperties({ config, onUpdate }: AgentPropertiesProps) {
 
       <div className="mt-4 p-3 bg-gray-800 rounded border border-gray-700">
         <p className="text-xs text-gray-400">
-          💡 Input is automatically taken from the previous node's output
+          💡 Input is automatically taken from the previous nodes output
         </p>
       </div>
     </div>
