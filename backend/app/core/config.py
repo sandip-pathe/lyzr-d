@@ -17,13 +17,14 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str
 
-    # Temporal
-    TEMPORAL_HOST: str
-    TEMPORAL_NAMESPACE: str = "default"
-    TEMPORAL_TLS_CERT: str | None = None  # Path to client cert for Temporal Cloud
-    TEMPORAL_TLS_KEY: str | None = None   # Path to client key for Temporal Cloud
-    TEMPORAL_TLS_CERT_BASE64: str | None = None  # Alternative: base64-encoded cert
-    TEMPORAL_TLS_KEY_BASE64: str | None = None   # Alternative: base64-encoded key
+    # Temporal Cloud
+    TEMPORAL_HOST: str  # Format: <region>.<cloud_provider>.api.temporal.io:7233
+    TEMPORAL_NAMESPACE: str  # Format: <namespace>.<account_id>
+    TEMPORAL_API_KEY: str | None = None  # Temporal Cloud API Key (recommended)
+    
+    # Legacy mTLS (optional, only if not using API key)
+    TEMPORAL_TLS_CERT: str | None = None  # Path to client cert
+    TEMPORAL_TLS_KEY: str | None = None   # Path to client key
 
     # APIs
     OPENAI_API_KEY: str

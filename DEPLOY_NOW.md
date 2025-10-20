@@ -47,12 +47,12 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
 
 # Temporal Cloud (get from Temporal Cloud dashboard)
-TEMPORAL_HOST=your-namespace.tmprl.cloud:7233
-TEMPORAL_NAMESPACE=your-namespace
+# Format: <region>.<provider>.api.temporal.io:7233
+TEMPORAL_HOST=us-west-2.aws.api.temporal.io:7233
+TEMPORAL_NAMESPACE=your-namespace.your-account-id
 
-# TLS Certificates (base64 encoded - see below)
-TEMPORAL_TLS_CERT_BASE64=<paste base64 content>
-TEMPORAL_TLS_KEY_BASE64=<paste base64 content>
+# Temporal Cloud API Key (recommended - generate in Temporal Cloud UI)
+TEMPORAL_API_KEY=<your-api-key-secret>
 
 # OpenAI API
 OPENAI_API_KEY=sk-proj-...
@@ -65,14 +65,14 @@ APP_NAME=Lyzr Orchestrator
 DEBUG=False
 ```
 
-**To base64 encode certificates** (Git Bash on Windows):
-```bash
-cd ~/Downloads  # Where you saved client.pem and client-key.pem
-base64 -w 0 client.pem > client.pem.b64
-base64 -w 0 client-key.pem > client-key.pem.b64
-cat client.pem.b64  # Copy this entire output
-cat client-key.pem.b64  # Copy this entire output
-```
+**How to get Temporal Cloud API Key**:
+1. Go to https://cloud.temporal.io/
+2. Navigate to **Settings** → **API Keys**
+3. Click **"Create API Key"**
+4. Name it (e.g., "railway-worker")
+5. Set expiration (e.g., 90 days)
+6. Copy the API key secret (shown only once!) 
+7. Paste into Railway's `TEMPORAL_API_KEY` variable
 
 ### **Step 5: Generate Public URL**
 
