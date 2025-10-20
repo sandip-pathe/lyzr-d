@@ -1,6 +1,5 @@
 # Nixpacks configuration for Temporal Worker
-# Let Nixpacks auto-detect Python from requirements.txt and .python-version
-# It automatically creates venv at /opt/venv and runs pip install
+# Nixpacks creates venv at /opt/venv - we need to use it explicitly
 
 [start]
-cmd = "python -m app.temporal.worker"
+cmd = "/opt/venv/bin/python -m app.temporal.worker"
