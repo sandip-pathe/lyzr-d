@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 interface WebSocketMessageStructure {
   event_type: string;
-  data: string | Record<string, any>; // Can be string or already parsed object
+  data: string | Record<string, any>;
   timestamp: string;
 }
 
