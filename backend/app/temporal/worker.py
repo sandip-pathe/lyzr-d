@@ -1,7 +1,9 @@
 # backend/app/temporal/worker.py
 
 import asyncio
+import os
 from temporalio.client import Client
+from temporalio.service import TLSConfig
 from temporalio.worker import Worker
 from app.core.config import settings
 from app.temporal.workflows import OrchestrationWorkflow
@@ -25,14 +27,56 @@ from app.temporal.activities import (
 
 async def main():
     """Start Temporal worker"""
+    import base64
+    
     print("🔨 Starting Temporal Worker...")
     print(f"📡 Connecting to: {settings.TEMPORAL_HOST}")
     print(f"🔧 Namespace: {settings.TEMPORAL_NAMESPACE}")
     
-    client = await Client.connect(
-        settings.TEMPORAL_HOST,
-        namespace=settings.TEMPORAL_NAMESPACE
-    )
+    # Configure TLS if connecting to Temporal Cloud
+    tls_config = None
+    
+    # Try base64-encoded certs first (Railway-friendly)
+    if settings.TEMPORAL_TLS_CERT_BASE64 and settings.TEMPORAL_TLS_KEY_BASE64:
+        print("🔐 Using base64-encoded TLS certificates for Temporal Cloud")
+        try:
+            client_cert = base64.b64decode(settings.TEMPORAL_TLS_CERT_BASE64)
+            client_key = base64.b64decode(settings.TEMPORAL_TLS_KEY_BASE64)
+            tls_config = TLSConfig(
+                client_cert=client_cert,
+                client_private_key=client_key,
+            )
+        except Exception as e:
+            print(f"❌ Failed to decode base64 certificates: {e}")
+    
+    # Fall back to file paths
+    elif settings.TEMPORAL_TLS_CERT and settings.TEMPORAL_TLS_KEY:
+        print("🔐 Using TLS certificate files for Temporal Cloud")
+        try:
+            with open(settings.TEMPORAL_TLS_CERT, 'rb') as f:
+                client_cert = f.read()
+            with open(settings.TEMPORAL_TLS_KEY, 'rb') as f:
+                client_key = f.read()
+            tls_config = TLSConfig(
+                client_cert=client_cert,
+                client_private_key=client_key,
+            )
+        except Exception as e:
+            print(f"❌ Failed to load certificate files: {e}")
+    
+    # Connect to Temporal with or without TLS
+    if tls_config:
+        client = await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+            tls=tls_config
+        )
+    else:
+        print("⚠️  Connecting without TLS (local development)")
+        client = await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE
+        )
     
     print("✅ Connected to Temporal!")
 

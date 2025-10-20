@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Temporal
     TEMPORAL_HOST: str
     TEMPORAL_NAMESPACE: str = "default"
+    TEMPORAL_TLS_CERT: str | None = None  # Path to client cert for Temporal Cloud
+    TEMPORAL_TLS_KEY: str | None = None   # Path to client key for Temporal Cloud
+    TEMPORAL_TLS_CERT_BASE64: str | None = None  # Alternative: base64-encoded cert
+    TEMPORAL_TLS_KEY_BASE64: str | None = None   # Alternative: base64-encoded key
 
     # APIs
     OPENAI_API_KEY: str

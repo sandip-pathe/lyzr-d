@@ -21,7 +21,7 @@ agent_executor_util = AgentExecutor()
 
 @activity.defn
 async def execute_agent_node(node: dict, activity_context: dict) -> dict:
-    """Execute agent node using new schema."""
+    """Execute agent node with intelligent input mapping."""
     node_data = node.get("data", {})
     node_config = node_data.get("config", {})
     
@@ -35,14 +35,50 @@ async def execute_agent_node(node: dict, activity_context: dict) -> dict:
     provider = node_config.get("provider", "openai")
     agent_id = node_config.get("agent_id", "gpt-4o-mini")
     
-    # Get input from previous node or workflow context
+    # ✅ USE OUTPUT MAPPER to intelligently extract input
+    # The previous_output is already a mapped BaseNodeOutput from workflow
     previous_output = activity_context.get("previous_output", {})
-    workflow_input = activity_context.get("input", {})
     
-    # Prepare input_data for the agent
-    input_data = previous_output if previous_output else workflow_input
+    # 🔍 DEBUG: Log what we received
+    print(f"=== DEBUG AGENT {name} ===")
+    print(f"previous_output type: {type(previous_output)}")
+    print(f"previous_output value: {previous_output}")
+    if isinstance(previous_output, dict):
+        print(f"previous_output keys: {list(previous_output.keys())}")
+    
+    activity.logger.info(f"📥 Agent '{name}' previous_output type: {type(previous_output)}")
+    activity.logger.info(f"📥 Agent '{name}' previous_output keys: {previous_output.keys() if isinstance(previous_output, dict) else 'N/A'}")
+    
+    # Prepare input_data for the agent based on what we received
+    if isinstance(previous_output, dict):
+        # If it's a dict, it might be from trigger or already formatted
+        if "prompt" in previous_output:
+            # Already has prompt field
+            input_data = previous_output
+        elif "input_text" in previous_output:
+            # Trigger format
+            input_data = {"prompt": previous_output.get("input_text", "")}
+        elif "output" in previous_output:
+            # Agent chaining - previous agent's output becomes this agent's prompt
+            input_data = {"prompt": previous_output.get("output", "")}
+        elif "body" in previous_output:
+            # API response
+            body = previous_output.get("body", {})
+            input_data = {"prompt": f"Process this API response: {body}"}
+        elif "current_item" in previous_output:
+            # Loop iteration
+            input_data = {"prompt": str(previous_output.get("current_item"))}
+        else:
+            # Generic dict - convert to prompt
+            import json
+            input_data = {"prompt": json.dumps(previous_output, indent=2)}
+    else:
+        # Fallback to string conversion
+        input_data = {"prompt": str(previous_output)}
 
     activity.logger.info(f"Executing agent node '{name}' with model {agent_id}")
+    print(f"📤 Agent '{name}' final input_data: {input_data}")
+    activity.logger.info(f"📤 Agent '{name}' final input_data: {input_data}")
 
     result = await agent_executor_util.execute(
         name=name,
@@ -77,7 +113,7 @@ async def compensate_node(node: dict, state: dict):
 
 @activity.defn
 async def execute_api_call_node(node: dict, activity_context: dict) -> dict:
-    """Execute API Call node using new schema."""
+    """Execute API Call node with intelligent input mapping."""
     node_data = node.get("data", {})
     node_config = node_data.get("config", {})
     
@@ -91,16 +127,39 @@ async def execute_api_call_node(node: dict, activity_context: dict) -> dict:
     if not url:
         raise ValueError(f"API Call node '{name}' requires a URL")
 
-    # Get input from previous node for dynamic body values
+    # ✅ USE OUTPUT MAPPER to intelligently format request body
     previous_output = activity_context.get("previous_output", {})
     
-    # Merge previous output into body if needed
+    # Start with config body as base
     request_body = {**body}
-    if previous_output and isinstance(previous_output, dict):
-        # Simple merge - can be enhanced with template resolution
-        request_body = {**request_body, "input": previous_output}
+    
+    # Intelligently merge previous output based on its type
+    if previous_output:
+        if isinstance(previous_output, dict):
+            if "output" in previous_output:
+                # Agent output - use the text
+                request_body["input"] = previous_output["output"]
+                request_body["context"] = previous_output
+            elif "body" in previous_output:
+                # Another API response - chain it
+                request_body["previous_response"] = previous_output["body"]
+            elif "current_item" in previous_output:
+                # Loop iteration
+                request_body["item"] = previous_output["current_item"]
+                request_body["iteration"] = previous_output.get("iteration", 0)
+            elif "action" in previous_output:
+                # Approval/HITL decision
+                request_body["approval_action"] = previous_output["action"]
+                request_body["approved_by"] = previous_output.get("approved_by", "system")
+            else:
+                # Generic dict merge
+                request_body.update(previous_output)
+        else:
+            # String or other type
+            request_body["input"] = str(previous_output)
 
     activity.logger.info(f"Executing API call '{name}' to {method} {url}")
+    activity.logger.debug(f"Request body: {request_body}")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -247,19 +306,37 @@ async def send_approval_request(node: dict, activity_context: dict) -> dict:
 
 @activity.defn
 async def execute_eval_node(node: dict, activity_context: dict) -> dict:
-    """Execute eval/compliance node using new schema."""
+    """Execute eval/compliance node with intelligent input mapping."""
     node_config = node.get("data", {}).get("config", {})
     
-    # Extract config based on new schema
+    # Extract config
     name = node_config.get("name", "Unnamed Eval")
     eval_type = node_config.get("eval_type", "schema")
     eval_specific_config = node_config.get("config", {})
     on_failure = node_config.get("on_failure", "block")
     
-    # Eval usually operates on the previous node's output
-    input_to_evaluate = activity_context.get("previous_output", {})
+    # ✅ USE OUTPUT MAPPER to extract evaluation target
+    previous_output = activity_context.get("previous_output", {})
+    
+    # Extract the actual content to evaluate based on previous node type
+    if isinstance(previous_output, dict):
+        if "output" in previous_output:
+            # Agent output - evaluate the text
+            input_to_evaluate = previous_output["output"]
+        elif "body" in previous_output:
+            # API response - evaluate the response
+            input_to_evaluate = previous_output["body"]
+        elif "value" in previous_output:
+            # Generic value
+            input_to_evaluate = previous_output["value"]
+        else:
+            # Evaluate entire object
+            input_to_evaluate = previous_output
+    else:
+        input_to_evaluate = previous_output
 
-    activity.logger.info(f"Evaluating input for node '{name}' using type '{eval_type}'")
+    activity.logger.info(f"📊 Evaluating '{name}' using type '{eval_type}'")
+    activity.logger.debug(f"Evaluation input: {input_to_evaluate}")
 
     result = await eval_service.evaluate(eval_type, input_to_evaluate, eval_specific_config)
     
@@ -356,25 +433,64 @@ async def publish_workflow_status(execution_id: str, workflow_id: str, status: s
 
 @activity.defn
 async def request_ui_approval(node: dict, activity_context: dict) -> dict:
-    """Publish an event specifically for the UI to request approval using new schema."""
+    """
+    HITL (Human in the Loop) - Request human approval/input with intelligent context mapping.
+    Supports approval decisions, form submissions, and manual interventions.
+    """
     node_config = node.get("data", {}).get("config", {})
     
-    # Extract config based on new schema
-    name = node_config.get("name", "Unnamed Approval")
-    description = node_config.get("description", "Please review and approve this step.")
+    # Extract config
+    name = node_config.get("name", "Human Review Required")
+    description = node_config.get("description", "Please review and take action.")
+    approval_type = node_config.get("approval_type", "binary")  # binary, form, review
+    required_fields = node_config.get("required_fields", [])  # For form type
     
+    # ✅ USE OUTPUT MAPPER to format context intelligently
     previous_output = activity_context.get("previous_output", {})
+    
+    # Build rich context for human reviewer
+    context = {"raw": previous_output}
+    
+    if isinstance(previous_output, dict):
+        if "output" in previous_output:
+            # Agent output - show the generated content
+            context["type"] = "agent_output"
+            context["content"] = previous_output["output"]
+            context["model"] = previous_output.get("model", "unknown")
+            context["cost"] = previous_output.get("cost", 0)
+        elif "body" in previous_output:
+            # API response - show the response
+            context["type"] = "api_response"
+            context["status_code"] = previous_output.get("status_code")
+            context["response"] = previous_output["body"]
+        elif "passed" in previous_output:
+            # Eval result - show the evaluation
+            context["type"] = "evaluation"
+            context["passed"] = previous_output["passed"]
+            context["score"] = previous_output.get("score")
+            context["reason"] = previous_output.get("reason", "")
+        else:
+            # Generic data
+            context["type"] = "data"
+            context["data"] = previous_output
+    else:
+        context["type"] = "text"
+        context["content"] = str(previous_output)
+    
     approval_id = str(uuid4())
 
-    await event_bus.publish("ui.approval.requested", {
+    # Publish HITL request event
+    await event_bus.publish("hitl.approval.requested", {
         "workflow_id": activity_context.get("workflow_id"),
         "execution_id": activity_context.get("execution_id"),
         "node_id": node.get("id"),
         "approval_id": approval_id,
         "title": name,
         "description": description,
-        "context": previous_output
+        "approval_type": approval_type,
+        "required_fields": required_fields,
+        "context": context
     })
 
-    activity.logger.info(f"UI approval request '{approval_id}' sent for node '{name}'")
-    return {"status": "ui_approval_sent", "approval_id": approval_id}
+    activity.logger.info(f"🙋 HITL approval '{approval_id}' requested for '{name}' (type: {approval_type})")
+    return {"status": "hitl_approval_sent", "approval_id": approval_id, "approval_type": approval_type}

@@ -1,0 +1,34 @@
+# Railway Services Configuration
+
+services:
+  - name: postgres
+    type: postgresql
+    plan: starter
+    
+  - name: redis
+    type: redis
+    plan: starter
+    
+  - name: backend
+    type: web
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthcheckPath: /health
+    env:
+      - TEMPORAL_HOST: ${{ Temporal.namespace }}.tmprl.cloud:7233
+      - TEMPORAL_NAMESPACE: ${{ Temporal.namespace }}
+      - DATABASE_URL: ${{ postgres.DATABASE_URL }}
+      - REDIS_URL: ${{ redis.REDIS_URL }}
+      - OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - CORS_ORIGINS: ${{ secrets.FRONTEND_URL }}
+    
+  - name: worker
+    type: worker
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u -m app.temporal.worker
+    env:
+      - TEMPORAL_HOST: ${{ Temporal.namespace }}.tmprl.cloud:7233
+      - TEMPORAL_NAMESPACE: ${{ Temporal.namespace }}
+      - DATABASE_URL: ${{ postgres.DATABASE_URL }}
+      - REDIS_URL: ${{ redis.REDIS_URL }}
+      - OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

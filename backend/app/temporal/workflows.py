@@ -4,7 +4,7 @@ import asyncio
 from temporalio import workflow
 from temporalio.common import RetryPolicy 
 from temporalio.exceptions import ApplicationError, ActivityError
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Dict, Any, List, Optional
 
 
@@ -16,6 +16,9 @@ with workflow.unsafe.imports_passed_through():
         publish_workflow_status, request_ui_approval
     )
     from app.services.agent_executor import AgentExecutor
+    from app.services.output_mapper import output_mapper
+    from app.schemas.node_outputs import BaseNodeOutput
+    from app.services.execution_context import ExecutionContext
 
 
 DEFAULT_ACTIVITY_RETRY_POLICY = RetryPolicy(
@@ -34,11 +37,13 @@ class OrchestrationWorkflow:
     """
     def __init__(self):
         self.node_outputs: Dict[str, Any] = {}
+        self.mapped_outputs: Dict[str, BaseNodeOutput] = {}  # Store mapped outputs
         self.workflow_context: Dict[str, Any] = {}
         self.execution_history: List[Dict[str, Any]] = []
         self._approval_status: Optional[str] = None
         self._approval_data: Optional[Dict[str, Any]] = None
         self._paused = False
+        self.execution_context: Optional[ExecutionContext] = None  # Will be initialized in run()
 
     def _get_full_state(self) -> Dict[str, Any]:
         """Combines workflow context and node outputs for activities."""
@@ -48,19 +53,92 @@ class OrchestrationWorkflow:
             "previous_output": self.execution_history[-1].get("result") if self.execution_history else None
         }
 
+    def _get_node_input(self, node_id: str, node_type: str, node_config: Dict[str, Any]) -> Any:
+        """Get intelligent input for a node from previous node using output mapper."""
+        print(f"=== _get_node_input CALLED ===")
+        print(f"Target node: {node_id} ({node_type})")
+        print(f"Execution history length: {len(self.execution_history)}")
+        print(f"Mapped outputs keys: {list(self.mapped_outputs.keys())}")
+        
+        # For trigger nodes, use workflow input
+        if node_type == "trigger":
+            return self.workflow_context.get("input", {})
+        
+        # Find previous node(s) that lead to this node
+        if len(self.execution_history) > 0:
+            # The current node might already be in history with "running" status
+            # So we need to look at the PREVIOUS completed node, not the last entry
+            last_executed = None
+            for i in range(len(self.execution_history) - 1, -1, -1):
+                entry = self.execution_history[i]
+                # Skip the current node if it's already in history
+                if entry.get("node_id") == node_id:
+                    continue
+                # Found a previous node
+                last_executed = entry
+                break
+            
+            if last_executed is None:
+                workflow.logger.info(f"⚠️ No previous executed node found, using workflow input")
+                return self.workflow_context.get("input", {})
+            
+            last_node_id = last_executed.get("node_id")
+            
+            print(f"Last executed node_id: {last_node_id}")
+            workflow.logger.info(f"🔍 _get_node_input: last_node_id={last_node_id}, has mapped_output={last_node_id in self.mapped_outputs}")
+            
+            # Check if we have mapped output for the previous node
+            if last_node_id in self.mapped_outputs:
+                previous_mapped = self.mapped_outputs[last_node_id]
+                
+                print(f"Found mapped output! Type: {type(previous_mapped)}")
+                print(f"Mapped output value: {previous_mapped}")
+                workflow.logger.info(f"🔍 Mapped output type: {type(previous_mapped)}, node_type: {previous_mapped.node_type}")
+                
+                # Use output mapper to extract appropriate input for current node
+                extracted_input = output_mapper.extract_for_target(
+                    output=previous_mapped,
+                    target_node_type=node_type,
+                    target_config=node_config
+                )
+                
+                print(f"Extracted input: {extracted_input}")
+                workflow.logger.info(f"🔄 Mapped input from {last_node_id} ({previous_mapped.node_type}) → {node_id} ({node_type})")
+                workflow.logger.info(f"🔍 Extracted input: {extracted_input}")
+                return extracted_input
+            
+            # Fallback to raw result
+            raw_result = last_executed.get("result", {})
+            workflow.logger.info(f"⚠️ No mapped output, using raw result: {raw_result}")
+            return raw_result
+        
+        # Ultimate fallback: workflow input
+        workflow.logger.info(f"⚠️ No execution history, using workflow input")
+        return self.workflow_context.get("input", {})
+
     @workflow.run
     async def run(self, workflow_id: str, workflow_def: Dict[str, Any], input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Main workflow execution entry point."""
+        execution_id = workflow.info().workflow_id
+        
         self.workflow_context = {
             "input": input_data,
             "workflow_id": workflow_id,
-            "execution_id": workflow.info().workflow_id,
+            "execution_id": execution_id,
         }
         self.node_outputs = {}
         self.execution_history = []
         self._paused = False
         self._approval_status = None
         self._approval_data = None
+        
+        # TODO: Re-enable ExecutionContext after fixing datetime serialization
+        # self.execution_context = ExecutionContext(
+        #     execution_id=execution_id,
+        #     workflow_id=workflow_id,
+        #     started_at=workflow.now()
+        # )
+        # self.execution_context.metadata["initial_input"] = input_data
 
         nodes: List[Dict] = workflow_def.get("nodes", [])
         edges: List[Dict] = workflow_def.get("edges", [])
@@ -107,6 +185,40 @@ class OrchestrationWorkflow:
                     # --- Node Execution ---
                     result = await self._execute_node(node)
 
+                    # --- Map Output to Schema ---
+                    node_config = node.get("data", {}).get("config", {})
+                    mapped_output = output_mapper.map_output(
+                        node_type=node_type,
+                        raw_output=result,
+                        node_id=current_node_id,
+                        node_config=node_config
+                    )
+                    self.mapped_outputs[current_node_id] = mapped_output
+                    print(f"=== MAPPED OUTPUT STORED ===")
+                    print(f"Node: {current_node_id} ({node_type})")
+                    print(f"Mapped type: {type(mapped_output)}")
+                    print(f"Mapped data: {mapped_output}")
+                    print(f"All mapped_outputs keys: {list(self.mapped_outputs.keys())}")
+
+                    # TODO: Re-enable ExecutionContext tracking
+                    # node_metadata = {
+                    #     "label": node_label,
+                    #     "config": node_config,
+                    #     "raw_output": result,
+                    # }
+                    # if isinstance(result, dict):
+                    #     if "cost" in result:
+                    #         node_metadata["cost"] = result["cost"]
+                    #     if "tokens_used" in result:
+                    #         node_metadata["tokens_used"] = result["tokens_used"]
+                    # self.execution_context.add_node_execution(
+                    #     node_id=current_node_id,
+                    #     node_type=node_type,
+                    #     output=mapped_output,
+                    #     metadata=node_metadata,
+                    #     timestamp=workflow.now()
+                    # )
+
                     # --- Update State & History ---
                     self.node_outputs[current_node_id] = result
                     history_entry["result"] = result
@@ -151,7 +263,7 @@ class OrchestrationWorkflow:
                     raise
 
             # --- Workflow Completion ---
-            # If we ended at an 'end' node, check if it should capture output from previous node
+            # Use simple last node output for now (will add intelligent selection later)
             final_output = None
             if current_node_id and node_map.get(current_node_id, {}).get("type") == "end":
                 end_node_config = node_map[current_node_id].get("data", {}).get("config", {})
@@ -193,12 +305,15 @@ class OrchestrationWorkflow:
         node_id = node.get("id", "")
         node_config = node.get("data", {}).get("config", {})
 
+        # Get intelligent input from previous node using output mapper
+        previous_output_data = self._get_node_input(node_id, node_type, node_config)
+
         # Prepare context to pass to activities
         activity_context = {
             **self.workflow_context,
             "node_outputs": self.node_outputs,
             "current_node_id": node_id,
-            "previous_output": self.execution_history[-1].get("result") if self.execution_history else None
+            "previous_output": previous_output_data
         }
 
         # Define default retry policy
@@ -252,15 +367,39 @@ class OrchestrationWorkflow:
             return result
 
         elif node_type == "timer":
+            # ✅ Smart duration extraction
             duration = node_config.get("duration_seconds", 0)
+            
+            # Try to extract duration from previous output if not in config
+            if duration == 0 and previous_output_data:
+                if isinstance(previous_output_data, dict):
+                    # Check for explicit delay_seconds field (from Output Mapper)
+                    if "delay_seconds" in previous_output_data:
+                        duration = previous_output_data["delay_seconds"]
+                    # Check for agent output with time reference
+                    elif "output" in previous_output_data:
+                        text = previous_output_data["output"]
+                        # Simple parsing for common patterns
+                        import re
+                        # Match "X seconds", "X minutes", "X hours"
+                        match = re.search(r'(\d+)\s*(second|minute|hour)s?', text.lower())
+                        if match:
+                            value = int(match.group(1))
+                            unit = match.group(2)
+                            if unit == "minute":
+                                duration = value * 60
+                            elif unit == "hour":
+                                duration = value * 3600
+                            else:
+                                duration = value
+                            workflow.logger.info(f"⏰ Extracted duration from agent: {value} {unit}(s) = {duration}s")
+            
+            workflow.logger.info(f"⏰ Timer node starting {duration}s delay")
             if duration > 0:
-                await workflow.execute_activity(
-                    execute_timer_node, args=[node, activity_context], # Simple activity to log start/end
-                    start_to_close_timeout=timedelta(seconds=duration + 30) # Add buffer
-                )
-                # Use Temporal's sleep for the actual delay
-                # await workflow.sleep(timedelta(seconds=duration))
-            return {"waited_seconds": duration}
+                # Use Temporal's deterministic sleep
+                await asyncio.sleep(duration)
+                workflow.logger.info(f"⏰ Timer node completed {duration}s delay")
+            return {"waited_seconds": duration, "completed_at": workflow.now().isoformat()}
 
         elif node_type == "event":
              timeout = timedelta(seconds=30)
