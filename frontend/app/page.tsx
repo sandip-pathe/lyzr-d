@@ -14,32 +14,21 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { timeAgo } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 // API function to fetch all workflows from the backend
 async function fetchWorkflows() {
-  const res = await fetch(`http://localhost:8000/api/workflows/`);
-  if (!res.ok) {
-    throw new Error("Failed to fetch workflows.");
-  }
-  return res.json();
+  return api.workflows.list();
 }
 
 // API function to create a new, empty workflow
 async function createNewWorkflow() {
-  const res = await fetch(`http://localhost:8000/api/workflows/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Untitled Workflow",
-      description: "A new workflow started from the dashboard.",
-      nodes: [],
-      edges: [],
-    }),
+  return api.workflows.create({
+    name: "Untitled Workflow",
+    description: "A new workflow started from the dashboard.",
+    nodes: [],
+    edges: [],
   });
-  if (!res.ok) {
-    throw new Error("Failed to create new workflow.");
-  }
-  return res.json();
 }
 
 export default function DashboardPage() {

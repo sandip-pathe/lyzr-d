@@ -2,15 +2,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useWorkflowStore } from "@/lib/store";
 import { useEffect } from "react";
+import { api } from "@/lib/api";
 
 async function fetchWorkflow(workflowId: string) {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/workflows/${workflowId}`
-  );
-  if (!res.ok) {
-    throw new Error("Network response was not ok");
-  }
-  return res.json();
+  return api.workflows.get(workflowId);
 }
 
 export function useWorkflow(workflowId: string) {

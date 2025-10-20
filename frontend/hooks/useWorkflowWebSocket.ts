@@ -9,6 +9,7 @@ import {
 } from "@/types/workflow";
 import { useWorkflowStore } from "@/lib/store";
 import { toast } from "sonner";
+import { wsUrl } from "@/lib/api";
 
 interface WebSocketMessageStructure {
   event_type: string;
@@ -40,9 +41,9 @@ export function useWorkflowWebSocket(
       return;
     }
 
-    const wsUrl = `ws://localhost:8000/api/events/ws/executions/${executionId}`;
-    console.log("[WebSocket] Attempting to connect to:", wsUrl);
-    const ws = new WebSocket(wsUrl);
+    const url = wsUrl(`api/events/ws/executions/${executionId}`);
+    console.log("[WebSocket] Attempting to connect to:", url);
+    const ws = new WebSocket(url);
 
     ws.onopen = () => {
       console.log("[WebSocket] Connected for execution", executionId);

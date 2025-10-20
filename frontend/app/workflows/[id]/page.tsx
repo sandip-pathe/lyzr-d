@@ -16,6 +16,7 @@ import { NarrationModal } from "@/components/modals/narration";
 import { OutputPanel } from "@/components/sidebar/output";
 import { NodePalette } from "@/components/sidebar/node-pallete";
 import { PropertiesPanel } from "@/components/sidebar/properties";
+import { api } from "@/lib/api";
 
 export default function WorkflowEditorPage({
   params,
@@ -49,18 +50,11 @@ export default function WorkflowEditorPage({
       comment: string;
     }) => {
       if (!currentApproval) throw new Error("No approval request active.");
-      return fetch(
-        `http://localhost:8000/api/approvals/${currentApproval.executionId}/approve`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, approver: "demo@user.com", comment }),
-        }
-      ).then((res) =>
-        res.ok
-          ? res.json()
-          : Promise.reject(new Error("Failed to respond to approval."))
-      );
+      return api.approvals.approve(currentApproval.executionId, {
+        action,
+        approver: "demo@user.com",
+        comment,
+      });
     },
     onSuccess: (data) => {
       toast.success(`Request ${data.status}!`);
@@ -75,12 +69,7 @@ export default function WorkflowEditorPage({
     refetch: fetchNarration,
   } = useQuery({
     queryKey: ["narration", executionId],
-    queryFn: () =>
-      executionId
-        ? fetch(
-            `http://localhost:8000/api/executions/${executionId}/narrate`
-          ).then((res) => res.json())
-        : null,
+    queryFn: () => (executionId ? api.executions.narrate(executionId) : null),
     enabled: false,
   });
 

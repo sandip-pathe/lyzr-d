@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mockNodes, mockEdges } from "@/lib/mock-data";
+import { api, apiUrl } from "@/lib/api";
 
 export function ExecutionToolbar() {
   const {
@@ -161,9 +162,7 @@ export function ExecutionToolbar() {
       if (!workflowId) throw new Error("No workflow ID.");
 
       // First, fetch what's actually stored in the database
-      const storedWorkflow = await fetch(
-        `http://localhost:8000/api/workflows/${workflowId}`
-      ).then((r) => r.json());
+      const storedWorkflow = await api.workflows.get(workflowId);
 
       console.log("🗄️ Workflow stored in DB:", storedWorkflow);
       console.log("🗄️ DB nodes:", storedWorkflow.definition?.nodes);
@@ -182,14 +181,11 @@ export function ExecutionToolbar() {
       );
       console.log("🔍 Full JSON:", JSON.stringify(nodes, null, 2));
 
-      return fetch(
-        `http://localhost:8000/api/workflows/${workflowId}/execute`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input_data: inputData }),
-        }
-      ).then(async (res) => {
+      return fetch(apiUrl(`api/workflows/${workflowId}/execute`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_data: inputData }),
+      }).then(async (res) => {
         if (!res.ok) {
           const errorData = await res.json();
           console.error("❌ Execution error:", errorData); // Log for debugging
@@ -244,7 +240,7 @@ export function ExecutionToolbar() {
         "💾 Saving workflow with payload:",
         JSON.stringify(payload, null, 2)
       );
-      return fetch(`http://localhost:8000/api/workflows/${workflowId}`, {
+      return fetch(apiUrl(`api/workflows/${workflowId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

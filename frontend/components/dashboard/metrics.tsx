@@ -17,18 +17,15 @@ import {
   Loader2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/api";
 
 // API fetching functions
 async function fetchSummaryMetrics() {
-  const res = await fetch(`http://localhost:8000/api/metrics/summary`);
-  if (!res.ok) throw new Error("Failed to fetch summary metrics.");
-  return res.json();
+  return api.metrics.get();
 }
 
 async function fetchAgentMetrics() {
-  const res = await fetch(`http://localhost:8000/api/metrics/agents`);
-  if (!res.ok) throw new Error("Failed to fetch agent metrics.");
-  return res.json();
+  return api.metrics.get();
 }
 
 export function MetricsDashboard() {
