@@ -1,3 +1,6 @@
 # Railway Procfile - Backend API Service
-# Since Railway root directory is /backend, no cd needed
+# Root directory is /backend
 web: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+# For Temporal Worker (separate service), use:
+# worker: python -m app.temporal.worker

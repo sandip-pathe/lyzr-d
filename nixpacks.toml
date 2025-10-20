@@ -1,14 +1,11 @@
-# Nixpacks configuration for Railway
-# Since Railway root directory is set to /backend, we don't need cd backend
+# Nixpacks configuration for Backend API
+# Nixpacks auto-detects Python and creates venv at /opt/venv
+# Railway root directory is set to /backend
 
 [phases.setup]
-nixPkgs = ['python311', 'python311Packages.pip', 'postgresql']
-
-[phases.install]
-cmds = ['pip install -r requirements.txt']
-
-[phases.build]
-cmds = []
+# Add PostgreSQL for psycopg2-binary compilation
+nixPkgs = ['...', 'postgresql']
 
 [start]
+# Start FastAPI application
 cmd = 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'

@@ -1,6 +1,6 @@
-# Nixpacks configuration for Backend API
+# Nixpacks configuration for Temporal Worker
 # Let Nixpacks auto-detect Python from requirements.txt and .python-version
 # It automatically creates venv at /opt/venv and runs pip install
 
 [start]
-cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+cmd = "python -m app.temporal.worker"
