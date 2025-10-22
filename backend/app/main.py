@@ -82,7 +82,8 @@ async def health():
                 Client.connect(
                     settings.TEMPORAL_HOST,
                     namespace=settings.TEMPORAL_NAMESPACE,
-                    api_key=settings.TEMPORAL_API_KEY
+                    api_key=settings.TEMPORAL_API_KEY,
+                    tls=True  # Enable TLS for Temporal Cloud
                 ),
                 timeout=5
             )
