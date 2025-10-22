@@ -1,6 +1,5 @@
 # Nixpacks configuration for Backend API
-# Nixpacks auto-detects Python and creates venv
-# The venv is automatically activated in PATH
+# Explicitly use the venv created by Nixpacks
 
 [start]
-cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+cmd = "/opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT"
