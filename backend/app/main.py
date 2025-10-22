@@ -13,6 +13,12 @@ async def lifespan(app: FastAPI):
     print("🚀 Lyzr Orchestrator API starting...")
     print(f"📡 Temporal: {settings.TEMPORAL_HOST}")
     print(f"📦 Redis: {settings.REDIS_URL}")
+    
+    # Initialize database tables
+    print("🗄️  Initializing database...")
+    from app.core.database import engine, Base
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database tables created")
 
     from app.core.events import event_bus
     from app.api.events import push_to_websocket_clients
