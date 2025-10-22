@@ -11,7 +11,6 @@ import { useWorkflowStore } from "@/lib/store";
 import { Separator } from "@/components/ui/separator";
 import {
   Play,
-  Save,
   Download,
   Sidebar,
   Loader2,
@@ -20,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mockNodes, mockEdges } from "@/lib/mock-data";
 import { api, apiUrl } from "@/lib/api";
@@ -236,10 +235,6 @@ export function ExecutionToolbar() {
         })),
         edges: edges.map(({ id, source, target }) => ({ id, source, target })),
       };
-      console.log(
-        "💾 Saving workflow with payload:",
-        JSON.stringify(payload, null, 2)
-      );
       return fetch(apiUrl(`api/workflows/${workflowId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -249,11 +244,31 @@ export function ExecutionToolbar() {
       );
     },
     onSuccess: () => {
-      toast.success("Workflow saved!");
       queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => console.error("Auto-save failed:", e.message),
   });
+
+  // Auto-save when nodes or edges change
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  useEffect(() => {
+    if (!workflowId || nodes.length === 0) return;
+
+    // Debounce saves by 2 seconds
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveMutation.mutate();
+    }, 2000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [nodes, edges, workflowName]);
 
   return (
     <>
@@ -300,23 +315,6 @@ export function ExecutionToolbar() {
             <TooltipContent>Stop Execution</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="h-6" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
-              >
-                {saveMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Save</TooltipContent>
-          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon">

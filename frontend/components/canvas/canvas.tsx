@@ -234,8 +234,7 @@ function WorkflowCanvasInner() {
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
-        snapToGrid={true}
-        snapGrid={snapGrid}
+        snapToGrid={false}
         defaultEdgeOptions={{
           type: "smoothstep",
           animated: mode === "executing",
