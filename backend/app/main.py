@@ -29,7 +29,16 @@ async def lifespan(app: FastAPI):
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
         
-        if not existing_tables:
+        # Check if workflows table has the new columns
+        needs_migration = False
+        if 'workflows' in existing_tables:
+            columns = [col['name'] for col in inspector.get_columns('workflows')]
+            if 'session_id' not in columns or 'is_template' not in columns:
+                print("⚠️  Database schema outdated, recreating tables...")
+                needs_migration = True
+                Base.metadata.drop_all(bind=engine)
+        
+        if not existing_tables or needs_migration:
             print("🔨 Creating database tables...")
             Base.metadata.create_all(bind=engine)
             print("✅ Database tables created")
