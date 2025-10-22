@@ -1,5 +1,0 @@
-# Nixpacks configuration for Backend API
-# Explicitly use the venv created by Nixpacks
-
-[phases.start]
-cmd = "/opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT"

@@ -1,5 +1,0 @@
-# Nixpacks configuration for Temporal Worker
-# Nixpacks creates venv at /opt/venv - we need to use it explicitly
-
-[start]
-cmd = "/opt/venv/bin/python -m app.temporal.worker"

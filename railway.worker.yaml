@@ -1,0 +1,10 @@
+# Railway Deployment Configuration
+# Temporal Worker Service - deploys from /backend directory
+
+build:
+  builder: NIXPACKS
+  
+deploy:
+  startCommand: python -u -m app.temporal.worker
+  restartPolicyType: ON_FAILURE
+  restartPolicyMaxRetries: 10

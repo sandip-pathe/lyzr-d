@@ -1,2 +1,0 @@
-# Procfile for Railway worker service
-worker: python -u -m app.temporal.worker
