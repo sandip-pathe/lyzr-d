@@ -14,11 +14,70 @@ async def lifespan(app: FastAPI):
     print(f"📡 Temporal: {settings.TEMPORAL_HOST}")
     print(f"📦 Redis: {settings.REDIS_URL}")
     
-    # Initialize database tables
-    print("🗄️  Initializing database...")
-    from app.core.database import engine, Base
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created")
+    # Initialize database with health check
+    print("🗄️  Checking database...")
+    try:
+        from app.core.database import engine, Base
+        from sqlalchemy import text, inspect
+        
+        # Test connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        print("✅ Database connection successful")
+        
+        # Check and create tables
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        if not existing_tables:
+            print("🔨 Creating database tables...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database tables created")
+        else:
+            print(f"✅ Database ready ({len(existing_tables)} tables)")
+            # Ensure all tables exist (safe operation)
+            Base.metadata.create_all(bind=engine)
+        
+        # Initialize workflow templates
+        print("📝 Loading workflow templates...")
+        from app.services.templates import get_workflow_templates
+        from app.core.database import SessionLocal
+        from app.models.workflow import Workflow
+        from datetime import datetime
+        
+        db = SessionLocal()
+        try:
+            templates = get_workflow_templates()
+            templates_added = 0
+            for template_data in templates:
+                # Check if template already exists
+                existing = db.query(Workflow).filter(Workflow.id == template_data["id"]).first()
+                if not existing:
+                    template = Workflow(
+                        id=template_data["id"],
+                        name=template_data["name"],
+                        description=template_data["description"],
+                        definition=template_data["definition"],
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(template)
+                    templates_added += 1
+            
+            if templates_added > 0:
+                db.commit()
+                print(f"✅ Added {templates_added} workflow templates")
+            else:
+                print(f"✅ All {len(templates)} templates already loaded")
+        except Exception as e:
+            db.rollback()
+            print(f"⚠️  Template loading error: {e}")
+        finally:
+            db.close()
+            
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise
 
     from app.core.events import event_bus
     from app.api.events import push_to_websocket_clients
@@ -78,18 +137,31 @@ async def root():
 
 @app.get("/health")
 async def health():
+    """Health check endpoint with database, temporal, and redis checks"""
+    from sqlalchemy import text
+    
+    db_ok = False
     temporal_ok = False
     redis_ok = False
 
+    # Check database
     try:
-        # Connect with API key for Temporal Cloud
+        from app.core.database import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception as e:
+        print(f"⚠️  Database health check failed: {e}")
+
+    # Check Temporal
+    try:
         if settings.TEMPORAL_API_KEY:
             await asyncio.wait_for(
                 Client.connect(
                     settings.TEMPORAL_HOST,
                     namespace=settings.TEMPORAL_NAMESPACE,
                     api_key=settings.TEMPORAL_API_KEY,
-                    tls=True  # Enable TLS for Temporal Cloud
+                    tls=True
                 ),
                 timeout=5
             )
@@ -104,17 +176,20 @@ async def health():
         temporal_ok = True
     except Exception as e:
         print(f"⚠️  Temporal health check failed: {e}")
-        pass
 
+    # Check Redis
     try:
         from app.core.events import event_bus
         event_bus.redis_client.ping()
         redis_ok = True
-    except:
-        pass
+    except Exception as e:
+        print(f"⚠️  Redis health check failed: {e}")
+
+    all_healthy = db_ok and temporal_ok and redis_ok
 
     return {
-        "status": "healthy" if (temporal_ok and redis_ok) else "degraded",
+        "status": "healthy" if all_healthy else "degraded",
+        "database": "ok" if db_ok else "error",
         "temporal": "ok" if temporal_ok else "error",
         "redis": "ok" if redis_ok else "error",
     }

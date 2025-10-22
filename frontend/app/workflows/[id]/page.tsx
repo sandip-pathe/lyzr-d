@@ -52,7 +52,7 @@ export default function WorkflowEditorPage({
       if (!currentApproval) throw new Error("No approval request active.");
       return api.approvals.approve(currentApproval.executionId, {
         action,
-        approver: "demo@user.com",
+        approver: "workflow.orchestrator@lyzr.ai",
         comment,
       });
     },

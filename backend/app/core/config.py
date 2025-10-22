@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_PORT: int = 8000
 
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    # CORS - Production URLs will be set via environment variables
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://lyzr.anaya.legal"]
     
     # Frontend URL (for notifications and approval links)
     FRONTEND_URL: str = "http://localhost:3000"
