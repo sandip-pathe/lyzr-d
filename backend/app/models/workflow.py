@@ -13,6 +13,11 @@ class Workflow(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     definition: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    
+    # Session-based isolation
+    session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    is_template: Mapped[bool] = mapped_column(String, nullable=True, default="false")  # Templates persist, user workflows don't
+    
     created_at: Mapped[Optional[str]] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[str]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 

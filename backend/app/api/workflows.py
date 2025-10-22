@@ -21,17 +21,48 @@ async def get_temporal_client() -> Client:
 
 # --- [NEW ENDPOINT] ---
 @router.get("/")
-async def list_workflows(db: Session = Depends(get_db)):
-    """List all available workflow definitions"""
-    workflows = db.query(Workflow).order_by(desc(Workflow.updated_at)).all()
+async def list_workflows(
+    session_id: str | None = None,
+    db: Session = Depends(get_db)
+):
+    """List available workflow definitions
+    - Templates (is_template=true) are shown to everyone
+    - User workflows filtered by session_id (only if provided)
+    """
+    query = db.query(Workflow).order_by(desc(Workflow.updated_at))
+    
+    if session_id:
+        # Show templates + session workflows
+        query = query.filter(
+            (Workflow.is_template == True) | (Workflow.session_id == session_id)
+        )
+    else:
+        # Show only templates if no session
+        query = query.filter(Workflow.is_template == True)
+    
+    workflows = query.all()
     return {"items": workflows}
+
+@router.delete("/session/{session_id}")
+async def cleanup_session(session_id: str, db: Session = Depends(get_db)):
+    """Delete all workflows for a session (called when browser tab closes)"""
+    deleted = db.query(Workflow).filter(
+        Workflow.session_id == session_id,
+        Workflow.is_template == False
+    ).delete()
+    db.commit()
+    return {"deleted": deleted, "session_id": session_id}
 
 @router.post("/")
 async def create_workflow(
     workflow: WorkflowCreateSchema,
+    session_id: str | None = None,
     db: Session = Depends(get_db)
 ):
-    """Create new workflow definition"""
+    """Create new workflow definition
+    - If session_id provided, workflow belongs to that session (temporary)
+    - Otherwise marked as template (permanent)
+    """
     workflow_id = str(uuid4())
     db_workflow = Workflow(
         id=workflow_id,
@@ -40,7 +71,9 @@ async def create_workflow(
         definition={
             "nodes": [n.dict() for n in workflow.nodes],
             "edges": [e.dict() for e in workflow.edges]
-        }
+        },
+        session_id=session_id,  # Link to session
+        is_template=False if session_id else True  # Only permanent if no session
     )
     db.add(db_workflow)
     db.commit()

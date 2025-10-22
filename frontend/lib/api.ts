@@ -9,6 +9,41 @@ export const API_URL =
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
 
 /**
+ * Session Management - Generate and store session ID in browser
+ */
+function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+
+  let sessionId = sessionStorage.getItem("workflow_session_id");
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
+    sessionStorage.setItem("workflow_session_id", sessionId);
+
+    // Cleanup on tab close
+    window.addEventListener("beforeunload", () => {
+      cleanupSession(sessionId!);
+    });
+  }
+  return sessionId;
+}
+
+/**
+ * Cleanup session data when tab closes
+ */
+async function cleanupSession(sessionId: string) {
+  try {
+    await fetch(apiUrl(`api/workflows/session/${sessionId}`), {
+      method: "DELETE",
+      keepalive: true, // Important: allows request to complete even after page unload
+    });
+  } catch (error) {
+    console.error("Session cleanup failed:", error);
+  }
+}
+
+/**
  * Build API endpoint URL
  */
 export function apiUrl(path: string): string {
@@ -63,18 +98,23 @@ export async function apiFetch<T = any>(
 export const api = {
   // Workflows
   workflows: {
-    list: () => apiFetch("/api/workflows/"),
+    list: () => {
+      const sessionId = getSessionId();
+      return apiFetch(`/api/workflows/?session_id=${sessionId}`);
+    },
     get: (id: string) => apiFetch(`/api/workflows/${id}`),
     create: (data: {
       name: string;
       description?: string;
       nodes?: any[];
       edges?: any[];
-    }) =>
-      apiFetch("/api/workflows/", {
+    }) => {
+      const sessionId = getSessionId();
+      return apiFetch(`/api/workflows/?session_id=${sessionId}`, {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      });
+    },
     update: (id: string, data: any) =>
       apiFetch(`/api/workflows/${id}`, {
         method: "PUT",
