@@ -76,12 +76,20 @@ async def health():
     redis_ok = False
 
     try:
+        # Connect with API key for Temporal Cloud
+        connect_kwargs = {
+            "namespace": settings.TEMPORAL_NAMESPACE
+        }
+        if settings.TEMPORAL_API_KEY:
+            connect_kwargs["api_key"] = settings.TEMPORAL_API_KEY
+        
         await asyncio.wait_for(
-            Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE),
-            timeout=2
+            Client.connect(settings.TEMPORAL_HOST, **connect_kwargs),
+            timeout=5
         )
         temporal_ok = True
-    except:
+    except Exception as e:
+        print(f"⚠️  Temporal health check failed: {e}")
         pass
 
     try:
