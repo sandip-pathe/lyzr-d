@@ -77,16 +77,23 @@ async def health():
 
     try:
         # Connect with API key for Temporal Cloud
-        connect_kwargs = {
-            "namespace": settings.TEMPORAL_NAMESPACE
-        }
         if settings.TEMPORAL_API_KEY:
-            connect_kwargs["api_key"] = settings.TEMPORAL_API_KEY
-        
-        await asyncio.wait_for(
-            Client.connect(settings.TEMPORAL_HOST, **connect_kwargs),
-            timeout=5
-        )
+            await asyncio.wait_for(
+                Client.connect(
+                    settings.TEMPORAL_HOST,
+                    namespace=settings.TEMPORAL_NAMESPACE,
+                    api_key=settings.TEMPORAL_API_KEY
+                ),
+                timeout=5
+            )
+        else:
+            await asyncio.wait_for(
+                Client.connect(
+                    settings.TEMPORAL_HOST,
+                    namespace=settings.TEMPORAL_NAMESPACE
+                ),
+                timeout=5
+            )
         temporal_ok = True
     except Exception as e:
         print(f"⚠️  Temporal health check failed: {e}")
