@@ -58,6 +58,8 @@ async def lifespan(app: FastAPI):
                         name=template_data["name"],
                         description=template_data["description"],
                         definition=template_data["definition"],
+                        is_template="true",  # Mark as template
+                        session_id=None,  # Templates don't belong to sessions
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow()
                     )

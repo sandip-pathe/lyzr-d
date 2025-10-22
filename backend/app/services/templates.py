@@ -8,11 +8,13 @@ def get_workflow_templates() -> List[Dict[str, Any]]:
     """Get all pre-built workflow templates with frontend-compatible schema"""
     
     # Template 1: Simple Sentiment Analysis
+    t1_id = "template-sentiment-analysis"
     t1_trigger = str(uuid.uuid4())
     t1_agent = str(uuid.uuid4())
     t1_end = str(uuid.uuid4())
     
     template1 = {
+        "id": t1_id,
         "name": "📊 Sentiment Analysis Pipeline",
         "description": "Analyze customer feedback sentiment using OpenAI GPT-4",
         "is_template": True,
@@ -73,6 +75,7 @@ def get_workflow_templates() -> List[Dict[str, Any]]:
     }
     
     # Template 2: Multi-Agent Research
+    t2_id = "template-multi-agent-research"
     t2_trigger = str(uuid.uuid4())
     t2_researcher = str(uuid.uuid4())
     t2_analyst = str(uuid.uuid4())
@@ -80,6 +83,7 @@ def get_workflow_templates() -> List[Dict[str, Any]]:
     t2_end = str(uuid.uuid4())
     
     template2 = {
+        "id": t2_id,
         "name": "🔬 Multi-Agent Research Team",
         "description": "Three AI agents collaborate on research: Researcher, Analyst, Writer",
         "is_template": True,
@@ -174,12 +178,14 @@ def get_workflow_templates() -> List[Dict[str, Any]]:
     }
     
     # Template 3: Content Moderation
+    t3_id = "template-content-moderation"
     t3_trigger = str(uuid.uuid4())
     t3_moderator = str(uuid.uuid4())
     t3_approval = str(uuid.uuid4())
     t3_end = str(uuid.uuid4())
     
     template3 = {
+        "id": t3_id,
         "name": "🛡️ AI Content Moderation",
         "description": "AI screening with human approval for questionable content",
         "is_template": True,

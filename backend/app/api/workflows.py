@@ -34,11 +34,11 @@ async def list_workflows(
     if session_id:
         # Show templates + session workflows
         query = query.filter(
-            (Workflow.is_template == True) | (Workflow.session_id == session_id)
+            (Workflow.is_template == "true") | (Workflow.session_id == session_id)
         )
     else:
         # Show only templates if no session
-        query = query.filter(Workflow.is_template == True)
+        query = query.filter(Workflow.is_template == "true")
     
     workflows = query.all()
     return {"items": workflows}
@@ -48,7 +48,7 @@ async def cleanup_session(session_id: str, db: Session = Depends(get_db)):
     """Delete all workflows for a session (called when browser tab closes)"""
     deleted = db.query(Workflow).filter(
         Workflow.session_id == session_id,
-        Workflow.is_template == False
+        Workflow.is_template == "false"
     ).delete()
     db.commit()
     return {"deleted": deleted, "session_id": session_id}
@@ -73,7 +73,7 @@ async def create_workflow(
             "edges": [e.dict() for e in workflow.edges]
         },
         session_id=session_id,  # Link to session
-        is_template=False if session_id else True  # Only permanent if no session
+        is_template="false" if session_id else "true"  # Only permanent if no session
     )
     db.add(db_workflow)
     db.commit()
