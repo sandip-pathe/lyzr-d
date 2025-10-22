@@ -39,13 +39,13 @@ class NotificationService:
                                     "type": "button",
                                     "text": {"type": "plain_text", "text": "✅ Approve"},
                                     "style": "primary",
-                                    "url": f"http://localhost:3000/approve/{workflow_id}/{node_id}?action=approve"
+                                    "url": f"{settings.FRONTEND_URL}/approve/{workflow_id}/{node_id}?action=approve"
                                 },
                                 {
                                     "type": "button",
                                     "text": {"type": "plain_text", "text": "❌ Reject"},
                                     "style": "danger",
-                                    "url": f"http://localhost:3000/approve/{workflow_id}/{node_id}?action=reject"
+                                    "url": f"{settings.FRONTEND_URL}/approve/{workflow_id}/{node_id}?action=reject"
                                 }
                             ]
                         }
@@ -67,10 +67,10 @@ class NotificationService:
                         "html": f"""
                         <h2>{title}</h2>
                         <p>{description}</p>
-                        <a href="http://localhost:3000/approve/{workflow_id}/{node_id}?action=approve">
+                        <a href="{settings.FRONTEND_URL}/approve/{workflow_id}/{node_id}?action=approve">
                             Approve
                         </a> | 
-                        <a href="http://localhost:3000/approve/{workflow_id}/{node_id}?action=reject">
+                        <a href="{settings.FRONTEND_URL}/approve/{workflow_id}/{node_id}?action=reject">
                             Reject
                         </a>
                         """

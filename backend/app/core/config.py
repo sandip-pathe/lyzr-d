@@ -10,6 +10,9 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    
+    # Frontend URL (for notifications and approval links)
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Database
     DATABASE_URL: str

@@ -67,7 +67,7 @@ export default function DashboardPage() {
         <header className="flex items-center justify-between pb-8 border-b">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome back, Sandip
+              Welcome to the future of workflows.
             </h1>
             <p className="text-gray-600 mt-1">
               Build, refine, and productionize agents effortlessly in minutes.
