@@ -33,6 +33,14 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
                 allowed = True
             elif re.match(r"https://.*\.up\.railway\.app$", origin):
                 allowed = True
+            # Also allow any .legal domain (for your frontend)
+            elif re.match(r"https://.*\.legal$", origin):
+                allowed = True
+            # Allow localhost for local development (any port)
+            elif re.match(r"http://localhost(:\d+)?$", origin):
+                allowed = True
+            elif re.match(r"http://127\.0\.0\.1(:\d+)?$", origin):
+                allowed = True
         
         # Handle preflight
         if request.method == "OPTIONS":
@@ -185,7 +193,7 @@ app.add_middleware(
 )
 
 print(f"🌐 CORS enabled for: {settings.cors_origins_list}")
-print(f"🌐 Also allowing all *.railway.app and *.up.railway.app origins")
+print(f"🌐 Also allowing all *.railway.app, *.up.railway.app, *.legal, and localhost origins")
 
 app.include_router(workflows.router, prefix="/api")
 app.include_router(approvals.router, prefix="/api")

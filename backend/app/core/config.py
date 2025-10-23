@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # CORS - Can be set via CORS_ORIGINS environment variable (comma-separated)
     # Use "*" to allow all origins (not recommended for production with credentials)
-    CORS_ORIGINS: str = "http://localhost:3000,https://lyzr.anaya.legal"
+    CORS_ORIGINS: str = "*"
     
     # Frontend URL (for notifications and approval links)
     FRONTEND_URL: str = "http://localhost:3000"
