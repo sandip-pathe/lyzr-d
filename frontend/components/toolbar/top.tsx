@@ -21,12 +21,14 @@ import {
   PlayCircle,
   RefreshCw,
   Upload,
+  Home,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mockNodes, mockEdges } from "@/lib/mock-data";
 import { api, apiUrl } from "@/lib/api";
+import Link from "next/link";
 
 export function ExecutionToolbar() {
   const {
@@ -461,6 +463,22 @@ export function ExecutionToolbar() {
     <>
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-10 bg-black p-2 rounded-xl flex items-center gap-2 text-white">
         <TooltipProvider>
+          {/* Home/Logo Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href="/">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-gray-800"
+                >
+                  <Home className="w-4 h-4" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Back to Dashboard</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-6" />
           <div className="px-3">
             <h1 className="text-sm font-semibold">{workflowName}</h1>
           </div>

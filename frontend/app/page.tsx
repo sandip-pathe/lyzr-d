@@ -21,17 +21,89 @@ async function fetchWorkflows() {
   return api.workflows.list();
 }
 
+// GenZ-style workflow name generator
+function generateWorkflowName(): string {
+  const vibes = [
+    "cosmic",
+    "based",
+    "sigma",
+    "mid",
+    "bussin",
+    "slay",
+    "fire",
+    "goated",
+    "immaculate",
+    "elite",
+    "legendary",
+    "mythic",
+    "divine",
+    "chaos",
+    "zen",
+    "vibing",
+    "chill",
+    "wild",
+    "epic",
+    "stellar",
+    "quantum",
+    "neon",
+    "cyber",
+    "retro",
+    "meta",
+    "ultra",
+    "hyper",
+    "turbo",
+    "mega",
+    "giga",
+    "tera",
+  ];
+
+  const creatures = [
+    "capybara",
+    "axolotl",
+    "quokka",
+    "fennec",
+    "panda",
+    "sloth",
+    "otter",
+    "dolphin",
+    "butterfly",
+    "phoenix",
+    "dragon",
+    "unicorn",
+    "narwhal",
+    "gecko",
+    "penguin",
+    "koala",
+    "hedgehog",
+    "fox",
+    "wolf",
+    "bear",
+    "owl",
+    "raven",
+    "tiger",
+    "lynx",
+    "panther",
+    "falcon",
+    "eagle",
+    "shark",
+    "whale",
+    "manta",
+    "octopus",
+    "jellyfish",
+  ];
+
+  const vibe = vibes[Math.floor(Math.random() * vibes.length)];
+  const creature = creatures[Math.floor(Math.random() * creatures.length)];
+
+  return `${vibe}-${creature}`;
+}
+
 // API function to create a new, empty workflow
 async function createNewWorkflow() {
-  const timestamp = new Date().toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const name = generateWorkflowName();
 
   return api.workflows.create({
-    name: `New Workflow - ${timestamp}`,
+    name: name,
     description:
       "Start building your AI workflow by adding nodes and connecting them.",
     nodes: [],
