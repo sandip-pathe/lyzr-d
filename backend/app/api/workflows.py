@@ -120,10 +120,15 @@ async def execute_workflow(
     # FIX: Pass the workflow.definition to the validation function
     errors = validate_workflow(workflow.definition)
     if errors:
-        print(f"❌ Workflow validation errors: {errors}")  # Log for debugging
+        print(f"❌ Workflow validation errors for {workflow_id}:")
+        for error in errors:
+            print(f"   - {error}")
         raise HTTPException(
             status_code=400,
-            detail={"errors": errors},
+            detail={
+                "message": "Workflow validation failed",
+                "errors": errors
+            },
         )
     
     db.add(execution)

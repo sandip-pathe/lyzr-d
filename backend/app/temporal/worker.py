@@ -12,17 +12,16 @@ from app.temporal.workflows import OrchestrationWorkflow
 from app.temporal.activities import (
     compensate_node,
     execute_agent_node,
-    execute_api_call_node, # Use the new name
+    execute_api_call_node,
     execute_eval_node,
     execute_event_node,
     execute_merge_node,
     execute_meta_node,
     execute_timer_node,
     get_fallback_agent,
-    publish_generic_event, # Add the new activity
+    publish_generic_event,
     publish_workflow_status,
     request_ui_approval,
-    send_approval_request # Keep if used for external, else maybe remove
 )
 
 async def main():
@@ -42,19 +41,27 @@ async def main():
     # Legacy approach: mTLS certificates
     elif settings.TEMPORAL_TLS_CERT and settings.TEMPORAL_TLS_KEY:
         print("🔐 Using mTLS certificate authentication")
-        with open(settings.TEMPORAL_TLS_CERT, 'rb') as f:
-            client_cert = f.read()
-        with open(settings.TEMPORAL_TLS_KEY, 'rb') as f:
-            client_key = f.read()
-        tls_config = TLSConfig(
-            client_cert=client_cert,
-            client_private_key=client_key,
-        )
-        client = await Client.connect(
-            settings.TEMPORAL_HOST,
-            namespace=settings.TEMPORAL_NAMESPACE,
-            tls=tls_config
-        )
+        try:
+            with open(settings.TEMPORAL_TLS_CERT, 'rb') as f:
+                client_cert = f.read()
+            with open(settings.TEMPORAL_TLS_KEY, 'rb') as f:
+                client_key = f.read()
+            tls_config = TLSConfig(
+                client_cert=client_cert,
+                client_private_key=client_key,
+            )
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE,
+                tls=tls_config
+            )
+        except FileNotFoundError as e:
+            print(f"❌ TLS certificate files not found: {e}")
+            print("⚠️  Falling back to unauthenticated connection (local dev only)")
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE
+            )
     # Local development: no authentication
     else:
         print("⚠️  Connecting without authentication (local development only)")
@@ -76,11 +83,10 @@ async def main():
         execute_meta_node,
         execute_timer_node,
         get_fallback_agent,
-        publish_generic_event, # Register the new activity
+        publish_generic_event,
         publish_workflow_status,
         request_ui_approval,
-        send_approval_request # Keep if still needed
-        # Remove execute_http_request, execute_fork_node
+        # send_approval_request is redundant with request_ui_approval
     ]
 
     worker = Worker(

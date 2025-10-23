@@ -1,11 +1,64 @@
 import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 from temporalio.client import Client
 from contextlib import asynccontextmanager
 import asyncio
+import re
 from app.api import workflows, approvals, executions, node_types, events, metrics
 from app.core.config import settings
+
+
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    """Custom CORS middleware that supports pattern matching for Railway URLs"""
+    
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        
+        # Check if origin matches allowed patterns
+        allowed = False
+        allowed_origins = settings.cors_origins_list
+        
+        if "*" in allowed_origins:
+            allowed = True
+        elif origin:
+            # Check exact matches
+            if origin in allowed_origins:
+                allowed = True
+            # Check pattern matches for Railway and other deployment platforms
+            elif re.match(r"https://.*\.railway\.app$", origin):
+                allowed = True
+            elif re.match(r"https://.*\.up\.railway\.app$", origin):
+                allowed = True
+        
+        # Handle preflight
+        if request.method == "OPTIONS":
+            if allowed and origin:
+                return Response(
+                    status_code=200,
+                    headers={
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                        "Access-Control-Allow-Headers": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Max-Age": "3600",
+                    }
+                )
+            return Response(status_code=403)
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Add CORS headers to response
+        if allowed and origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Expose-Headers"] = "*"
+        
+        return response
 
 
 @asynccontextmanager
@@ -34,9 +87,17 @@ async def lifespan(app: FastAPI):
         if 'workflows' in existing_tables:
             columns = [col['name'] for col in inspector.get_columns('workflows')]
             if 'session_id' not in columns or 'is_template' not in columns:
-                print("⚠️  Database schema outdated, recreating tables...")
+                print("⚠️  Database schema outdated - new columns needed")
                 needs_migration = True
-                Base.metadata.drop_all(bind=engine)
+                # In production (DEBUG=False), require manual migration
+                if not settings.DEBUG:
+                    print("❌ Production mode: Manual migration required")
+                    print("   Run: ALTER TABLE workflows ADD COLUMN session_id VARCHAR;")
+                    print("   Run: ALTER TABLE workflows ADD COLUMN is_template BOOLEAN DEFAULT FALSE;")
+                    raise RuntimeError("Database schema mismatch. Manual migration required.")
+                else:
+                    print("🔧 Development mode: Auto-migrating...")
+                    Base.metadata.drop_all(bind=engine)
         
         if not existing_tables or needs_migration:
             print("🔨 Creating database tables...")
@@ -109,16 +170,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
-# CORS 
+# Add custom CORS middleware with pattern matching support
+app.add_middleware(CustomCORSMiddleware)
+
+# Also add standard CORS for backwards compatibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
+
+print(f"🌐 CORS enabled for: {settings.cors_origins_list}")
+print(f"🌐 Also allowing all *.railway.app and *.up.railway.app origins")
 
 app.include_router(workflows.router, prefix="/api")
 app.include_router(approvals.router, prefix="/api")

@@ -10,6 +10,7 @@ import {
   Clock,
   Zap,
   Activity,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExecutionEvent } from "@/types/workflow";
@@ -79,7 +80,7 @@ export function EventLogStream({
       {/* Event List */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         <AnimatePresence initial={false}>
-          {events.length === 0 ? (
+          {events.length === 0 && !wsConnected ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <Activity className="w-12 h-12 mb-2" />
               <p className="text-sm">No events yet</p>
@@ -87,23 +88,61 @@ export function EventLogStream({
                 Events will appear here during execution
               </p>
             </div>
+          ) : events.length === 0 && wsConnected ? (
+            <div className="flex flex-col items-center justify-center h-full text-blue-400">
+              <Loader2 className="w-8 h-8 mb-2 animate-spin" />
+              <p className="text-sm">Workflow initializing...</p>
+              <p className="text-xs mt-1 text-gray-400">
+                Waiting for first event
+              </p>
+            </div>
           ) : (
             events.map((event, index) => {
-              if (event.eventType === "failed") {
+              // Special handling for validation failures
+              if (event.eventType === "workflow.failed" && event.data?.errors) {
                 return (
-                  <div
-                    key={index}
-                    className="p-4 bg-red-50 border-l-4 border-red-500"
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-red-950/50 border border-red-800 rounded-lg"
                   >
-                    <h3 className="font-bold text-red-800">
-                      Validation Failed
-                    </h3>
-                    <ul className="mt-2 list-disc list-inside text-sm text-red-700">
-                      {event.data.errors.map((error: string, index: number) => (
-                        <li key={index}>{error}</li>
-                      ))}
-                    </ul>
-                  </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-red-900/50 rounded-lg">
+                        <XCircle className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-red-300 mb-1">
+                          ⚠️ Workflow Validation Failed
+                        </h3>
+                        <p className="text-sm text-red-400 mb-3">
+                          {event.data.message ||
+                            "Please fix the following issues and try again:"}
+                        </p>
+                        <div className="space-y-2">
+                          {event.data.errors.map(
+                            (error: string, idx: number) => (
+                              <div
+                                key={idx}
+                                className="flex items-start gap-2 text-sm"
+                              >
+                                <span className="text-red-500 font-bold">
+                                  •
+                                </span>
+                                <span className="text-red-200">{error}</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-red-800">
+                          <p className="text-xs text-red-400">
+                            💡 Tip: Check node configurations and connections in
+                            the canvas
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
                 );
               }
 

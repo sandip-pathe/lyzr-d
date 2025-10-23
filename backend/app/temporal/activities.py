@@ -10,6 +10,7 @@ from app.services.agent_executor import AgentExecutor
 from app.services.eval_service import EvalService
 from app.services.compensation_service import CompensationService
 from app.services.self_healing import SelfHealingService
+from app.services.output_mapper import OutputMapper
 from app.core.database import SessionLocal
 from app.models.workflow import ApprovalRequest
 from app.core.events import event_bus
@@ -18,6 +19,7 @@ eval_service = EvalService()
 compensation_service = CompensationService()
 self_healing_service = SelfHealingService()
 agent_executor_util = AgentExecutor()
+output_mapper = OutputMapper()
 
 @activity.defn
 async def execute_agent_node(node: dict, activity_context: dict) -> dict:
@@ -257,8 +259,13 @@ async def send_approval_request(node: dict, activity_context: dict) -> dict:
     node_config = node.get("data", {}).get("config", {})
     # Get details from the node config defined in schemas/node_types.py
     title = node_config.get("title", "Approval Required")
-    description = node_config.get("description", "Please review and take action.")
+    description = node_config.get("description") or node_config.get("message", "Please review and take action.")
+    
+    # Handle both approvers (array) and approver_email (single string) for backward compatibility
     approvers = node_config.get("approvers", [])
+    if not approvers and node_config.get("approver_email"):
+        approvers = [node_config.get("approver_email")]
+    
     channels = node_config.get("channels", ["ui"]) # Default to UI event
 
     approval_id = str(uuid4())
@@ -439,9 +446,9 @@ async def request_ui_approval(node: dict, activity_context: dict) -> dict:
     """
     node_config = node.get("data", {}).get("config", {})
     
-    # Extract config
+    # Extract config - support both description and message for backward compatibility
     name = node_config.get("name", "Human Review Required")
-    description = node_config.get("description", "Please review and take action.")
+    description = node_config.get("description") or node_config.get("message", "Please review and take action.")
     approval_type = node_config.get("approval_type", "binary")  # binary, form, review
     required_fields = node_config.get("required_fields", [])  # For form type
     

@@ -135,7 +135,7 @@ export function PropertiesPanel() {
         const _exhaustiveCheck: never = node.type;
         console.warn(
           "Unhandled node type in properties panel:",
-          _exhaustiveCheck
+          _exhaustiveCheck as string
         );
         return (
           <div className="text-sm text-red-500 flex items-center gap-2">

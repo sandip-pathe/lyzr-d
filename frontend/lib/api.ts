@@ -4,9 +4,25 @@
  */
 
 // Get API URL from environment variable with fallback
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+export const API_URL = (() => {
+  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  if (typeof window !== "undefined") {
+    console.log("🔗 API URL configured:", url);
+  }
+
+  return url;
+})();
+
+export const WS_URL = (() => {
+  const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+
+  if (typeof window !== "undefined") {
+    console.log("🔌 WebSocket URL configured:", url);
+  }
+
+  return url;
+})();
 
 /**
  * Session Management - Generate and store session ID in browser
@@ -85,7 +101,16 @@ export async function apiFetch<T = any>(
       );
     }
 
-    return response.json();
+    // Handle empty responses
+    const text = await response.text();
+    if (!text) return {} as T;
+
+    // Try to parse as JSON, fallback to text
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text as unknown as T;
+    }
   } catch (error) {
     console.error(`API Error [${path}]:`, error);
     throw error;

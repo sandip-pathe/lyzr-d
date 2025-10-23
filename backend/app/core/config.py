@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
+import os
 
 class Settings(BaseSettings):
     # App
@@ -8,11 +9,33 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_PORT: int = 8000
 
-    # CORS - Production URLs will be set via environment variables
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://lyzr.anaya.legal"]
+    # CORS - Can be set via CORS_ORIGINS environment variable (comma-separated)
+    # Use "*" to allow all origins (not recommended for production with credentials)
+    CORS_ORIGINS: str = "http://localhost:3000,https://lyzr.anaya.legal"
     
     # Frontend URL (for notifications and approval links)
     FRONTEND_URL: str = "http://localhost:3000"
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse CORS_ORIGINS string into a list"""
+        origins_str = self.CORS_ORIGINS.strip()
+        
+        # If set to "*", return ["*"] for allow all
+        if origins_str == "*":
+            return ["*"]
+        
+        # Parse comma-separated list
+        origins = [origin.strip() for origin in origins_str.split(",") if origin.strip()]
+        
+        # In production, also add common deployment URLs
+        if not self.DEBUG:
+            # Add the current Railway URL if available
+            railway_url = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+            if railway_url:
+                origins.append(f"https://{railway_url}")
+        
+        return origins
 
     # Database
     DATABASE_URL: str

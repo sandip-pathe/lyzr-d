@@ -16,6 +16,7 @@ import { NarrationModal } from "@/components/modals/narration";
 import { OutputPanel } from "@/components/sidebar/output";
 import { NodePalette } from "@/components/sidebar/node-pallete";
 import { PropertiesPanel } from "@/components/sidebar/properties";
+import { WorkflowProgressIndicator } from "@/components/toolbar/progress-indicator";
 import { api } from "@/lib/api";
 
 export default function WorkflowEditorPage({
@@ -92,6 +93,7 @@ export default function WorkflowEditorPage({
     <div className="h-screen w-screen overflow-hidden bg-gray-50">
       <WorkflowCanvas />
       <ExecutionToolbar />
+      <WorkflowProgressIndicator />
 
       <AnimatePresence>
         {leftSidebarOpen && (

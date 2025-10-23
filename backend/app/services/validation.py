@@ -65,26 +65,17 @@ def validate_workflow(workflow_definition: Dict[str, Any]) -> List[str]:
                  errors.append(f"API Call node '{label}' ({node_id}) is missing an HTTP method.")
 
         elif node_type == "approval":
-            if not config.get("description"):
-                errors.append(f"Approval node '{label}' ({node_id}) has no description configured.")
-            if not config.get("approvers"):
-                 errors.append(f"Approval node '{label}' ({node_id}) has no approvers configured.")
-            # Check for required outgoing handles
-            handles = {edge.get("sourceHandle") for edge in outgoing_edges}
-            if "approve" not in handles:
-                errors.append(f"Approval node '{label}' ({node_id}) is missing an outgoing connection for the 'approve' case.")
-            if "reject" not in handles:
-                errors.append(f"Approval node '{label}' ({node_id}) is missing an outgoing connection for the 'reject' case.")
+            if not config.get("description") and not config.get("message"):
+                errors.append(f"Approval node '{label}' ({node_id}) has no description/message configured.")
+            # Accept either approvers (array) or approver_email (single string) for backward compatibility
+            if not config.get("approvers") and not config.get("approver_email"):
+                 errors.append(f"Approval node '{label}' ({node_id}) has no approvers or approver_email configured.")
+            # Note: sourceHandle validation is optional - approval nodes can have default paths
 
         elif node_type == "conditional":
             if not config.get("condition_expression"):
                  errors.append(f"Conditional node '{label}' ({node_id}) is missing a condition expression.")
-            # Check for required outgoing handles
-            handles = {edge.get("sourceHandle") for edge in outgoing_edges}
-            if "true" not in handles:
-                errors.append(f"Conditional node '{label}' ({node_id}) is missing an outgoing connection for the 'true' case.")
-            if "false" not in handles:
-                errors.append(f"Conditional node '{label}' ({node_id}) is missing an outgoing connection for the 'false' case.")
+            # Note: sourceHandle validation is optional - conditional nodes can have default paths
 
         elif node_type == "eval":
             if not config.get("eval_type"):

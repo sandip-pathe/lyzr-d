@@ -115,18 +115,32 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Build</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card
-              className="hover:shadow-lg transition-shadow cursor-pointer bg-white"
-              onClick={handleCreateNew}
+              className={`transition-shadow bg-white ${
+                createWorkflowMutation.isPending
+                  ? "cursor-wait opacity-70"
+                  : "hover:shadow-lg cursor-pointer"
+              }`}
+              onClick={
+                createWorkflowMutation.isPending ? undefined : handleCreateNew
+              }
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-lg">
                   <div className="p-3 bg-purple-100 rounded-lg">
-                    <Plus className="w-6 h-6 text-purple-600" />
+                    {createWorkflowMutation.isPending ? (
+                      <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                    ) : (
+                      <Plus className="w-6 h-6 text-purple-600" />
+                    )}
                   </div>
-                  Create Workflow
+                  {createWorkflowMutation.isPending
+                    ? "Creating..."
+                    : "Create Workflow"}
                 </CardTitle>
                 <CardDescription>
-                  Design intelligent AI workflows with drag-and-drop nodes.
+                  {createWorkflowMutation.isPending
+                    ? "Setting up your new workflow..."
+                    : "Design intelligent AI workflows with drag-and-drop nodes."}
                 </CardDescription>
               </CardHeader>
             </Card>

@@ -98,6 +98,22 @@ class OutputMapper:
         - API → Agent: Extract response body as context
         """
         
+        # Validate input
+        if output is None:
+            print("[OutputMapper] Warning: output is None, returning empty dict")
+            return {}
+        
+        # Handle dict inputs (for backward compatibility)
+        if isinstance(output, dict):
+            source_type = output.get('node_type', 'unknown')
+            print(f"[OutputMapper] Processing dict output from {source_type}")
+        elif hasattr(output, 'node_type'):
+            source_type = output.node_type
+        else:
+            # If we can't determine type, return as-is
+            print(f"[OutputMapper] Warning: Cannot determine output type, returning as-is: {type(output)}")
+            return output
+        
         # Mapping rules: source_type → target_type → extraction_function
         MAPPING_RULES = {
             "trigger": {

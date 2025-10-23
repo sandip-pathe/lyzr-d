@@ -143,9 +143,22 @@ export const useWorkflowStore = create<WorkflowState>()(
     setSelectedNode: (id) => set({ selectedNodeId: id }),
 
     addEvent: (event) =>
-      set((state) => ({
-        events: [event, ...state.events], // Prepend for chronological order in UI
-      })),
+      set((state) => {
+        // Prevent duplicate events based on timestamp + nodeId + eventType
+        const eventKey = `${event.timestamp}-${event.nodeId}-${event.eventType}`;
+        const isDuplicate = state.events.some(
+          (e) => `${e.timestamp}-${e.nodeId}-${e.eventType}` === eventKey
+        );
+
+        if (isDuplicate) {
+          console.log("🔄 Skipping duplicate event:", eventKey);
+          return state;
+        }
+
+        return {
+          events: [event, ...state.events], // Prepend for chronological order in UI
+        };
+      }),
 
     clearEvents: () => set({ events: [] }),
 
