@@ -6,7 +6,7 @@ import os
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Lyzr Orchestrator"
-    DEBUG: bool = True
+    DEBUG: bool = False  # Production default
     API_PORT: int = 8000
 
     # CORS - Can be set via CORS_ORIGINS environment variable (comma-separated)

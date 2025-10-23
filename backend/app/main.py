@@ -44,26 +44,32 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
         
         # Handle preflight
         if request.method == "OPTIONS":
-            if allowed and origin:
-                return Response(
-                    status_code=200,
-                    headers={
-                        "Access-Control-Allow-Origin": origin,
-                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                        "Access-Control-Allow-Headers": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                        "Access-Control-Max-Age": "3600",
-                    }
-                )
+            if allowed:
+                headers = {
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "3600",
+                }
+                # If allowing all origins, use * for efficiency
+                if "*" in allowed_origins:
+                    headers["Access-Control-Allow-Origin"] = "*"
+                    # Note: Cannot use credentials with *
+                elif origin:
+                    headers["Access-Control-Allow-Origin"] = origin
+                    headers["Access-Control-Allow-Credentials"] = "true"
+                return Response(status_code=200, headers=headers)
             return Response(status_code=403)
         
         # Process request
         response = await call_next(request)
         
         # Add CORS headers to response
-        if allowed and origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+        if allowed:
+            if "*" in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = "*"
+            elif origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Expose-Headers"] = "*"
         
         return response
@@ -185,7 +191,7 @@ app.add_middleware(CustomCORSMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_credentials=False if "*" in settings.cors_origins_list else True,  # Can't use credentials with *
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
