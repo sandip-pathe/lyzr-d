@@ -102,14 +102,8 @@ def validate_workflow(workflow_definition: Dict[str, Any]) -> List[str]:
         if target_id not in node_ids:
             errors.append(f"Edge '{edge.get('id')}' references a non-existent target node '{target_id}'.")
 
-        # Validate handle usage
-        source_node = node_map.get(source_id)
-        if source_node:
-            source_type = source_node.get("type")
-            if source_type in ["conditional", "approval"] and not source_handle:
-                 errors.append(f"Edge '{edge.get('id')}' from a {source_type} node must specify a sourceHandle ('true'/'false' or 'approve'/'reject').")
-            elif source_type not in ["conditional", "approval", "fork", "event"] and source_handle: # Allow for multi-handle fork/event if designed that way
-                 errors.append(f"Edge '{edge.get('id')}' from a {source_type} node should not specify a sourceHandle unless it's conditional, approval, fork, or event.")
+        # Note: sourceHandle validation removed - nodes can have default paths or explicit handles
+        # This allows for more flexible workflow configurations
 
 
     return errors
