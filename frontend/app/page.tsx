@@ -155,29 +155,22 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-4 text-sm font-medium">
-            <a
-              href="https://docs.lyzr.ai"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link href="/api" className="text-purple-600 hover:text-purple-800">
+              API <ArrowRight className="inline w-4 h-4" />
+            </Link>
+            <Link
+              href="/docs"
               className="text-purple-600 hover:text-purple-800"
             >
               Docs <ArrowRight className="inline w-4 h-4" />
-            </a>
+            </Link>
             <a
-              href="https://lyzr-d-production.up.railway.app/docs"
+              href="https://docs.temporal.io"
               target="_blank"
               rel="noopener noreferrer"
               className="text-purple-600 hover:text-purple-800"
             >
-              API <ArrowRight className="inline w-4 h-4" />
-            </a>
-            <a
-              href="https://github.com/sandip-pathe/lyzr-d"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-purple-600 hover:text-purple-800"
-            >
-              GitHub <ArrowRight className="inline w-4 h-4" />
+              Learn More <ArrowRight className="inline w-4 h-4" />
             </a>
           </div>
         </header>
