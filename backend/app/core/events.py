@@ -32,6 +32,7 @@ class EventBus:
             "data": data_str,
             "timestamp": timestamp_str,
         }
+        print(f"📤 Publishing event to Redis pub/sub: {event_type}")
         await self.redis_client.publish(event_type, json.dumps(message_fields)) 
         workflow_id = data.get("workflow_id")
         execution_id = data.get("execution_id")
@@ -40,15 +41,17 @@ class EventBus:
             stream_key = f"workflow:{workflow_id}:events"
             # Pass the correctly typed dictionary to xadd (cast to Any to satisfy redis-py generics)
             await self.redis_client.xadd(stream_key, cast(Any, message_fields), maxlen=10000)
+            print(f"📤 Added to workflow stream: {stream_key}")
 
         if execution_id:
             stream_key = f"execution:{execution_id}:events"
             # Pass the correctly typed dictionary to xadd (cast to Any to satisfy redis-py generics)
             await self.redis_client.xadd(stream_key, cast(Any, message_fields), maxlen=5000)
+            print(f"📤 Added to execution stream: {stream_key}")
 
         # Persist original data (not the double-stringified one)
         await asyncio.to_thread(self._persist_to_db, event_type, data, timestamp)
-        print(f"📤 Event published: {event_type}")
+        print(f"✅ Event published successfully: {event_type}")
 
     def _persist_to_db(self, event_type: str, data: Dict[str, Any], timestamp: float):
         try:
@@ -69,19 +72,24 @@ class EventBus:
 
     async def listen(self):
         # ... (implementation as before) ...
+        print(f"🎧 Event bus listener starting... Subscribed to: {list(self.listeners.keys())}")
         async for message in self.pubsub.listen():
             if message["type"] == "message":
                 try:
                     # Message data is the full structure published now
                     full_data = json.loads(message["data"])
                     event_type = full_data["event_type"]
+                    print(f"🔔 Event bus received: {event_type} with {len(self.listeners.get(event_type, []))} listeners")
                     if event_type in self.listeners:
                         for callback in self.listeners[event_type]:
                             if asyncio.iscoroutinefunction(callback):
                                 # Pass the full data structure including timestamp etc.
+                                print(f"📞 Calling listener callback for {event_type}")
                                 await callback(full_data)
                 except Exception as e:
                     print(f"❌ Event listener error: {e}")
+                    import traceback
+                    traceback.print_exc()
 
 
     async def replay_from_stream(self, stream_key: str, start_id: str = "-", end_id: str = "+", count: Optional[int] = None) -> List[Dict[str, Any]]:

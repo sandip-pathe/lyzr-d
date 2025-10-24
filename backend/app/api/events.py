@@ -68,6 +68,8 @@ async def push_to_websocket_clients(event_data: dict):
     Broadcast events to WebSocket clients.
     event_data structure: {"event_type": str, "data": str (JSON), "timestamp": str}
     """
+    print(f"🔔 push_to_websocket_clients called with event_type: {event_data.get('event_type')}")
+    
     # Parse the inner 'data' string into an object first
     try:
         if isinstance(event_data.get("data"), str):
@@ -83,9 +85,13 @@ async def push_to_websocket_clients(event_data: dict):
     workflow_id = parsed_data.get("workflow_id")
     execution_id = parsed_data.get("execution_id")
     
-    print(f"📨 Broadcasting event {event_data.get('event_type')} to execution:{execution_id}")
+    print(f"📨 Broadcasting event {event_data.get('event_type')} to execution:{execution_id}, workflow:{workflow_id}")
+    print(f"📊 Active WebSocket channels: {list(manager.active_connections.keys())}")
+    print(f"📊 Clients on execution:{execution_id}: {len(manager.active_connections.get(f'execution:{execution_id}', []))}")
 
     if workflow_id:
         await manager.broadcast(f"workflow:{workflow_id}", event_data)
+        print(f"✅ Broadcasted to workflow:{workflow_id}")
     if execution_id:
         await manager.broadcast(f"execution:{execution_id}", event_data)
+        print(f"✅ Broadcasted to execution:{execution_id}")

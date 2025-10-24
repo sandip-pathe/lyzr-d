@@ -243,11 +243,12 @@ async def publish_generic_event(event_type: str, data: Dict[str, Any]):
     """Publishes any event to the event bus."""
     # Ensure data doesn't contain non-serializable items if not already handled
     try:
+        activity.logger.info(f"🔔 Publishing generic event: {event_type} with data keys: {list(data.keys())}")
         await event_bus.publish(event_type, data)
-        activity.logger.info(f"Published generic event: {event_type}")
+        activity.logger.info(f"✅ Published generic event: {event_type}")
         return {"status": "published", "event_type": event_type}
     except Exception as e:
-        activity.logger.error(f"Failed to publish generic event {event_type}: {e}")
+        activity.logger.error(f"❌ Failed to publish generic event {event_type}: {e}")
         # Return a structured failure result rather than raising so workflow can decide retry behavior
         return {"status": "failed", "event_type": event_type, "error": str(e)}
 
@@ -435,7 +436,9 @@ async def publish_workflow_status(execution_id: str, workflow_id: str, status: s
         "result": result, # Already should be dict/serializable
         "error": error
     }
+    activity.logger.info(f"🔔 Publishing workflow status: {event_type} for execution {execution_id}")
     await event_bus.publish(event_type, data)
+    activity.logger.info(f"✅ Workflow status published successfully: {event_type}")
 
 
 @activity.defn
