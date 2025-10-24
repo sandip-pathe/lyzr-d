@@ -141,11 +141,17 @@ async def lifespan(app: FastAPI):
     for event_type in websocket_events:
         await event_bus.subscribe(event_type, push_to_websocket_clients)
 
-    asyncio.create_task(event_bus.listen())
+    print(f"✅ Subscribed to {len(websocket_events) + 2} event types")
+    print(f"📋 Event listeners: {list(event_bus.listeners.keys())}")
+    
+    # Start the event bus listener task
+    listener_task = asyncio.create_task(event_bus.listen())
+    print("🎧 Event bus listener task created and started")
 
     print("✅ All routers and event listeners loaded")
     yield
     print("👋 Lyzr Orchestrator API shutting down...")
+    listener_task.cancel()  # Clean up the listener on shutdown
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 

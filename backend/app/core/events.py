@@ -71,25 +71,34 @@ class EventBus:
         print(f"📥 Subscribed to: {event_type}")
 
     async def listen(self):
-        # ... (implementation as before) ...
+        """Main event listener loop - processes Redis pub/sub messages"""
         print(f"🎧 Event bus listener starting... Subscribed to: {list(self.listeners.keys())}")
-        async for message in self.pubsub.listen():
-            if message["type"] == "message":
-                try:
-                    # Message data is the full structure published now
-                    full_data = json.loads(message["data"])
-                    event_type = full_data["event_type"]
-                    print(f"🔔 Event bus received: {event_type} with {len(self.listeners.get(event_type, []))} listeners")
-                    if event_type in self.listeners:
-                        for callback in self.listeners[event_type]:
-                            if asyncio.iscoroutinefunction(callback):
-                                # Pass the full data structure including timestamp etc.
-                                print(f"📞 Calling listener callback for {event_type}")
-                                await callback(full_data)
-                except Exception as e:
-                    print(f"❌ Event listener error: {e}")
-                    import traceback
-                    traceback.print_exc()
+        try:
+            async for message in self.pubsub.listen():
+                print(f"📬 Raw message received: type={message.get('type')}, channel={message.get('channel')}")
+                if message["type"] == "message":
+                    try:
+                        # Message data is the full structure published now
+                        full_data = json.loads(message["data"])
+                        event_type = full_data["event_type"]
+                        print(f"🔔 Event bus received: {event_type} with {len(self.listeners.get(event_type, []))} listeners")
+                        if event_type in self.listeners:
+                            for callback in self.listeners[event_type]:
+                                if asyncio.iscoroutinefunction(callback):
+                                    # Pass the full data structure including timestamp etc.
+                                    print(f"📞 Calling listener callback for {event_type}")
+                                    await callback(full_data)
+                        else:
+                            print(f"⚠️ No listeners registered for event type: {event_type}")
+                    except Exception as e:
+                        print(f"❌ Event listener error processing message: {e}")
+                        import traceback
+                        traceback.print_exc()
+        except Exception as e:
+            print(f"❌ CRITICAL: Event bus listener crashed: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
 
     async def replay_from_stream(self, stream_key: str, start_id: str = "-", end_id: str = "+", count: Optional[int] = None) -> List[Dict[str, Any]]:
