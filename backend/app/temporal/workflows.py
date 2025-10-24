@@ -12,7 +12,7 @@ with workflow.unsafe.imports_passed_through():
     from app.temporal.activities import (
         compensate_node, execute_agent_node, execute_api_call_node,
         execute_eval_node, execute_event_node, execute_merge_node,
-        execute_timer_node, get_fallback_agent,
+        execute_timer_node, get_fallback_agent, publish_generic_event,
         publish_workflow_status, request_ui_approval
     )
     from app.services.agent_executor import AgentExecutor
@@ -570,9 +570,9 @@ class OrchestrationWorkflow:
             "error": error,
             "timestamp": workflow.now().isoformat() # Add timestamp
         }
-        # Using publish_workflow_status activity for simplicity, could create a dedicated one
+        # Use publish_generic_event activity to publish to event bus
         await workflow.execute_activity(
-            "publish_generic_event", # Assuming a generic activity exists or reusing publish_workflow_status
+            publish_generic_event,
             args=[event_type, data],
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=2),

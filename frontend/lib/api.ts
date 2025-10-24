@@ -155,8 +155,7 @@ export const api = {
   // Executions
   executions: {
     get: (id: string) => apiFetch(`/api/executions/${id}`),
-    narrate: (id: string) =>
-      apiFetch(`/api/executions/${id}/narrate`, { method: "POST" }),
+    narrate: (id: string) => apiFetch(`/api/executions/${id}/narrate`),
   },
 
   // Approvals
