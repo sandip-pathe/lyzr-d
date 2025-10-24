@@ -48,10 +48,18 @@ async def get_execution(execution_id: str, db: Session = Depends(get_db)):
 
     # Try to augment with live Temporal state, if available
     try:
-        client = await Client.connect(
-            settings.TEMPORAL_HOST,
-            namespace=settings.TEMPORAL_NAMESPACE,
-        )
+        if settings.TEMPORAL_API_KEY:
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE,
+                api_key=settings.TEMPORAL_API_KEY,
+                tls=True
+            )
+        else:
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE,
+            )
         handle = client.get_workflow_handle(execution_id)
         state = await handle.query(OrchestrationWorkflow.get_state)
         data["current_state"] = state
@@ -83,10 +91,20 @@ async def cancel_execution(execution_id: str, db: Session = Depends(get_db)):
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
-    client = await Client.connect(
-        settings.TEMPORAL_HOST,
-        namespace=settings.TEMPORAL_NAMESPACE,
-    )
+    
+    if settings.TEMPORAL_API_KEY:
+        client = await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+            api_key=settings.TEMPORAL_API_KEY,
+            tls=True
+        )
+    else:
+        client = await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+        )
+    
     handle = client.get_workflow_handle(execution_id)
     await handle.cancel()
     execution.status = "canceled"

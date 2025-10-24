@@ -16,8 +16,21 @@ from app.services.validation import validate_workflow
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 async def get_temporal_client() -> Client:
-    """Get Temporal client"""
-    return await Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE)
+    """Get Temporal client with proper authentication"""
+    if settings.TEMPORAL_API_KEY:
+        # Temporal Cloud with API Key (recommended)
+        return await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+            api_key=settings.TEMPORAL_API_KEY,
+            tls=True
+        )
+    else:
+        # Local Temporal or self-hosted
+        return await Client.connect(
+            settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE
+        )
 
 # --- [NEW ENDPOINT] ---
 @router.get("/")
@@ -79,7 +92,15 @@ async def create_workflow(
     db.commit()
     db.refresh(db_workflow)
     
-    return {"id": workflow_id, "status": "created"}
+    # Return full workflow object for immediate use
+    return {
+        "id": db_workflow.id,
+        "name": db_workflow.name,
+        "description": db_workflow.description,
+        "definition": db_workflow.definition,
+        "created_at": db_workflow.created_at,
+        "updated_at": db_workflow.updated_at
+    }
 
 @router.get("/{workflow_id}")
 async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):

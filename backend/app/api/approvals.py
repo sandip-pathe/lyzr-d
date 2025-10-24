@@ -85,8 +85,20 @@ async def respond_to_approval(
         approval.resolved_at = datetime.now(timezone.utc).isoformat()
         db.commit()
         
-        # Signal Temporal workflow
-        client = await Client.connect(settings.TEMPORAL_HOST, namespace=settings.TEMPORAL_NAMESPACE)
+        # Signal Temporal workflow with proper authentication
+        if settings.TEMPORAL_API_KEY:
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE,
+                api_key=settings.TEMPORAL_API_KEY,
+                tls=True
+            )
+        else:
+            client = await Client.connect(
+                settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE
+            )
+        
         handle = client.get_workflow_handle(execution_id)
         
         signal_data = {
