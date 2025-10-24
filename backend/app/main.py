@@ -13,64 +13,29 @@ from app.core.config import settings
 
 
 class CustomCORSMiddleware(BaseHTTPMiddleware):
-    """Custom CORS middleware that supports pattern matching for Railway URLs"""
+    """Custom CORS middleware - allows all origins"""
     
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin")
         
-        # Check if origin matches allowed patterns
-        allowed = False
-        allowed_origins = settings.cors_origins_list
-        
-        if "*" in allowed_origins:
-            allowed = True
-        elif origin:
-            # Check exact matches
-            if origin in allowed_origins:
-                allowed = True
-            # Check pattern matches for Railway and other deployment platforms
-            elif re.match(r"https://.*\.railway\.app$", origin):
-                allowed = True
-            elif re.match(r"https://.*\.up\.railway\.app$", origin):
-                allowed = True
-            # Also allow any .legal domain (for your frontend)
-            elif re.match(r"https://.*\.legal$", origin):
-                allowed = True
-            # Allow localhost for local development (any port)
-            elif re.match(r"http://localhost(:\d+)?$", origin):
-                allowed = True
-            elif re.match(r"http://127\.0\.0\.1(:\d+)?$", origin):
-                allowed = True
-        
         # Handle preflight
         if request.method == "OPTIONS":
-            if allowed:
-                headers = {
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
                     "Access-Control-Allow-Headers": "*",
                     "Access-Control-Max-Age": "3600",
                 }
-                # If allowing all origins, use * for efficiency
-                if "*" in allowed_origins:
-                    headers["Access-Control-Allow-Origin"] = "*"
-                    # Note: Cannot use credentials with *
-                elif origin:
-                    headers["Access-Control-Allow-Origin"] = origin
-                    headers["Access-Control-Allow-Credentials"] = "true"
-                return Response(status_code=200, headers=headers)
-            return Response(status_code=403)
+            )
         
         # Process request
         response = await call_next(request)
         
         # Add CORS headers to response
-        if allowed:
-            if "*" in allowed_origins:
-                response.headers["Access-Control-Allow-Origin"] = "*"
-            elif origin:
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Expose-Headers"] = "*"
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "*"
         
         return response
 
@@ -184,22 +149,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
-# Add custom CORS middleware with pattern matching support
+# Add custom CORS middleware - allows all origins
 app.add_middleware(CustomCORSMiddleware)
 
 # Also add standard CORS for backwards compatibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=False if "*" in settings.cors_origins_list else True,  # Can't use credentials with *
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
 
-print(f"🌐 CORS enabled for: {settings.cors_origins_list}")
-print(f"🌐 Also allowing all *.railway.app, *.up.railway.app, *.legal, and localhost origins")
+print(f"🌐 CORS enabled for ALL origins (*)")
 
 app.include_router(workflows.router, prefix="/api")
 app.include_router(approvals.router, prefix="/api")
