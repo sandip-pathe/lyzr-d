@@ -35,21 +35,37 @@ manager = ConnectionManager()
 
 @router.websocket("/ws/workflows/{workflow_id}")
 async def websocket_workflow_events(websocket: WebSocket, workflow_id: str):
-    await manager.connect(websocket, f"workflow:{workflow_id}")
+    channel = f"workflow:{workflow_id}"
+    await manager.connect(websocket, channel)
+    print(f"✅ WebSocket connected for {channel}, total clients: {len(manager.active_connections.get(channel, []))}")
     try:
         while True:
-            await asyncio.sleep(60) # Keep connection alive
+            # Keep connection alive, wait for client messages or timeout
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send ping to keep alive
+                await websocket.send_json({"type": "ping"})
     except WebSocketDisconnect:
-        manager.disconnect(websocket, f"workflow:{workflow_id}")
+        manager.disconnect(websocket, channel)
+        print(f"🔌 WebSocket disconnected for {channel}")
 
 @router.websocket("/ws/executions/{execution_id}")
 async def websocket_execution_events(websocket: WebSocket, execution_id: str):
-    await manager.connect(websocket, f"execution:{execution_id}")
+    channel = f"execution:{execution_id}"
+    await manager.connect(websocket, channel)
+    print(f"✅ WebSocket connected for {channel}, total clients: {len(manager.active_connections.get(channel, []))}")
     try:
         while True:
-            await asyncio.sleep(60)
+            # Keep connection alive, wait for client messages or timeout
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send ping to keep alive
+                await websocket.send_json({"type": "ping"})
     except WebSocketDisconnect:
-        manager.disconnect(websocket, f"execution:{execution_id}")
+        manager.disconnect(websocket, channel)
+        print(f"🔌 WebSocket disconnected for {channel}")
 
 @router.get("/replay/workflow/{workflow_id}")
 async def replay_workflow_events(workflow_id: str, from_timestamp: Optional[float] = Query(None)):

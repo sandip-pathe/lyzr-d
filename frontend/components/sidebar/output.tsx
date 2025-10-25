@@ -235,19 +235,80 @@ function OutputRenderer({ output }: { output: any }) {
 
   if (typeof output === "string") {
     return (
-      <p className="text-sm whitespace-pre-wrap text-gray-700">{output}</p>
+      <div className="bg-white p-3 rounded-md border border-gray-200">
+        <p className="text-sm whitespace-pre-wrap text-gray-700">{output}</p>
+      </div>
     );
   }
 
   if (typeof output === "boolean" || typeof output === "number") {
-    return <p className="text-sm font-mono text-gray-700">{String(output)}</p>;
+    return (
+      <div className="bg-white p-3 rounded-md border border-gray-200">
+        <p className="text-sm font-mono text-gray-700">{String(output)}</p>
+      </div>
+    );
   }
 
   if (typeof output === "object") {
+    // Try to extract meaningful content from the object
+    const content = extractContent(output);
+    
+    if (content) {
+      return (
+        <div className="space-y-2">
+          <div className="bg-white p-3 rounded-md border border-gray-200">
+            <p className="text-sm whitespace-pre-wrap text-gray-700">{content}</p>
+          </div>
+          {/* Show metadata in a compact format */}
+          {(output.usage || output.cost !== undefined) && (
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              {output.usage && (
+                <span>{output.usage.total_tokens || output.usage.prompt_tokens} tokens</span>
+              )}
+              {output.cost !== undefined && (
+                <span className="flex items-center">
+                  <DollarSign className="w-3 h-3 mr-1" />${output.cost.toFixed(6)}
+                </span>
+              )}
+              {output.model && <span className="font-mono">{output.model}</span>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Fallback to formatted JSON
     return (
       <pre className="text-xs bg-white p-2 rounded-md border border-gray-200 overflow-auto max-h-60 font-mono text-gray-700">
         {JSON.stringify(output, null, 2)}
       </pre>
+    );
+  }
+
+  return <p className="text-sm text-gray-500 italic">Unknown output format</p>;
+}
+
+// Helper function to extract the main content from an output object
+function extractContent(output: any): string | null {
+  // Priority order for content extraction
+  if (typeof output.output === "string") return output.output;
+  if (typeof output.result === "string") return output.result;
+  if (typeof output.text === "string") return output.text;
+  if (typeof output.content === "string") return output.content;
+  if (typeof output.message === "string") return output.message;
+  if (typeof output.value === "string") return output.value;
+  if (typeof output.data === "string") return output.data;
+  
+  // Handle nested objects
+  if (output.output && typeof output.output === "object") {
+    return extractContent(output.output);
+  }
+  if (output.result && typeof output.result === "object") {
+    return extractContent(output.result);
+  }
+  
+  return null;
+}
     );
   }
 
