@@ -71,7 +71,7 @@ export const BaseNode = memo(
                   )}
                 />
                 <span className="text-xs text-gray-500 capitalize">
-                  {data.status.replace("_", " ")}
+                  {data.status?.replace("_", " ") || "idle"}
                 </span>
               </div>
             )}

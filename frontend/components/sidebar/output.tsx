@@ -155,7 +155,7 @@ function NodeOutputCard({ output }: { output: NodeOutput }) {
           <span className="text-xl">{getIcon()}</span>
           <div>
             <p className="font-medium capitalize text-sm">
-              {output.node_type.replace("_", " ")}
+              {output.node_type?.replace("_", " ") || "Unknown"}
             </p>
             <p className="text-xs text-gray-500 font-mono">{output.node_id}</p>
           </div>

@@ -170,7 +170,8 @@ export function EventLogStream({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-gray-200">
-                          {event.eventType.replace("_", " ").toUpperCase()}
+                          {event.eventType?.replace("_", " ").toUpperCase() ||
+                            "EVENT"}
                         </span>
                         <span className="text-xs text-gray-500 flex items-center gap-1">
                           <Clock className="w-3 h-3" />

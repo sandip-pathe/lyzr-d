@@ -107,7 +107,7 @@ function TimelineEvent({
       <div className="flex-1 pb-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm font-medium text-gray-900">
-            {event.eventType.replace("_", " ").toUpperCase()}
+            {event.eventType?.replace("_", " ").toUpperCase() || "EVENT"}
           </span>
           <span className="text-xs text-gray-500">
             {formatTime(event.timestamp)}
