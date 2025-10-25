@@ -32,11 +32,12 @@ async def main():
     
     # Modern approach: API Key authentication (recommended)
     if settings.TEMPORAL_API_KEY:
-        print("� Using API Key authentication for Temporal Cloud")
+        print("🔑 Using API Key authentication for Temporal Cloud")
         client = await Client.connect(
             settings.TEMPORAL_HOST,
             namespace=settings.TEMPORAL_NAMESPACE,
             api_key=settings.TEMPORAL_API_KEY,
+            tls=True,  # Enable TLS for Temporal Cloud
         )
     # Legacy approach: mTLS certificates
     elif settings.TEMPORAL_TLS_CERT and settings.TEMPORAL_TLS_KEY:
